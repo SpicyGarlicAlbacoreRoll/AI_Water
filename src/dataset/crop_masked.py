@@ -14,7 +14,7 @@ from osgeo import gdal
 from ..gdal_wrapper import gdal_open
 from ..asf_typing import MaskedDatasetMetadata
 from .common import dataset_dir, valid_image
-from ..config import NETWORK_DEMS
+from ..config import NETWORK_DEMS, TIMESTEPS
 
 TILE_REGEX = re.compile(r"(.*)\.vh(.*)\.(tiff|tif|TIFF|TIF)")
 
@@ -131,47 +131,60 @@ def make_timerseries_metadata(
 
 
 def generate_timeseries_from_metadata(
-    metadata: MaskedDatasetMetadata,
+    metadata: MaskedTimeseriesMetadata,
     clip_range: Optional[Tuple[float, float]] = None,
     edit: bool = False,
-    dems=NETWORK_DEMS
+    dems=NETWORK_DEMS,
+    timesteps=TIMESTEPS
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """ Yield training images and masks from the given metadata. """
-    output_shape = (dems, dems, 2)
+    output_shape = (timesteps, dems, dems, 2)
     mask_output_shape = (dems, dems, 1)
-    for tile_vh, tile_vv, mask_name in metadata:
-        tif_vh = gdal.Open(tile_vh)
+    for time_series, mask_name in metadata:
 
-        # Should prevent the following error
-        # ValueError: cannot reshape array of size 524288 into shape (64,64,2)
-        comp = str(tif_vh.RasterXSize)
-        if(comp != str(dems) and "mock" not in comp):
-            # mock is include for the unit tests
-            continue
-        try:
-            with gdal_open(tile_vh) as f:
-                tile_vh_array = f.ReadAsArray()
-        except FileNotFoundError:
-            continue
-        try:
-            with gdal_open(tile_vv) as f:
-                tile_vv_array = f.ReadAsArray()
-        except FileNotFoundError:
-            continue
+        time_series_stack = []
 
-        tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
+        # iterate through vv vh image pairs, make a composite, and append them to our list
+        for tile_vh, tile_vv in time_series:
+            tif_vh = gdal.Open(tile_vh)
 
-        if not edit:
-            if not valid_image(tile_array):
+            # Should prevent the following error
+            # ValueError: cannot reshape array of size 524288 into shape (64,64,2)
+            comp = str(tif_vh.RasterXSize)
+            if(comp != str(dems) and "mock" not in comp):
+                # mock is include for the unit tests
                 continue
+            try:
+                with gdal_open(tile_vh) as f:
+                    tile_vh_array = f.ReadAsArray()
+            except FileNotFoundError:
+                continue
+            try:
+                with gdal_open(tile_vv) as f:
+                    tile_vv_array = f.ReadAsArray()
+            except FileNotFoundError:
+                continue
+
+            tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
+
+            if not edit:
+                if not valid_image(tile_array):
+                    continue
+
+            x = np.array(tile_array).astype('float32')
+            # Clip all x values to a fixed range
+            if clip_range:
+                min_, max_ = clip_range
+                np.clip(x, min_, max_, out=x)
+            
+            # time_series_stack.stack(tile_array, axis=0)
+            time_series_stack.append(tile_array)
+        
+        # transform our list of timeseries composites into (timesteps, dim, dim, 2)
+        res = np.array(time_series_stack).astype('float32')
 
         with gdal_open(mask_name) as f:
             mask_array = f.ReadAsArray()
-
-        x = np.array(tile_array).astype('float32')
-        y = np.array(mask_array).astype('float32')
-        # Clip all x values to a fixed range
-        if clip_range:
-            min_, max_ = clip_range
-            np.clip(x, min_, max_, out=x)
-        yield (x.reshape(output_shape), y.reshape(mask_output_shape))
+            y = np.array(mask_array).astype('float32')
+    
+        yield (res.reshape(output_shape), y.reshape(mask_output_shape))
