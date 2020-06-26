@@ -78,14 +78,14 @@ def load_replace_data(
 def make_timerseries_metadata(
     dataset: str,
     edit: bool = False
-) -> Tuple[MaskedDatasetMetadata, MaskedDatasetMetadata]:
+) -> Tuple[MaskedTimeseriesMetadata, MaskedTimeseriesMetadata]:
     """ Returns two lists of metadata. One for the training data and one for the
     testing data. """
     train_metadata = []
     test_metadata = []
 
     for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
-        for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(dirpath):
+        for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(os.join(dirpath, dirnames)):
             
             time_series_data = []
             timeseries_mask = ""
@@ -113,6 +113,7 @@ def make_timerseries_metadata(
                 
                 time_series_data.append(data)
 
+            # each data point is a list of time series vv + vh pairs with corresponding cropland masks
             data = (time_series_data, crop_mask_path)
 
             folder = os.path.basename(dirpath)
