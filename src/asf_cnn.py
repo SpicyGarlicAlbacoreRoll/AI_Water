@@ -10,6 +10,7 @@ from keras.models import Model
 from keras.preprocessing.image import Iterator
 
 from .dataset.masked import load_dataset as load_dataset_masked
+from .dataset.crop_masked import load_timeseries_dataset as load_timeseries_dataset
 from .dataset.masked import load_replace_data
 from .model import ModelType, model_type, save_model
 from .asf_typing import History
@@ -28,6 +29,8 @@ def train_model(
 
     if model_type(model) == ModelType.MASKED:
         training_set, test_set = load_dataset_masked(dataset)
+    elif model_type(model) == ModelType.CROP_CLASSIFIER:
+        training_set, test_set = load_timeseries_dataset(dataset)
     else:
         print(
             "Unknown model output shape."

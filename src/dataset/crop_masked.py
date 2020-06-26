@@ -12,14 +12,14 @@ from keras.preprocessing.image import ImageDataGenerator, Iterator
 from osgeo import gdal
 
 from ..gdal_wrapper import gdal_open
-from ..asf_typing import MaskedDatasetMetadata
+from ..asf_typing import MaskedDatasetMetadata, MaskedTimeseriesMetadata
 from .common import dataset_dir, valid_image
 from ..config import NETWORK_DEMS, TIMESTEPS
 
 TILE_REGEX = re.compile(r"(.*)\.vh(.*)\.(tiff|tif|TIFF|TIF)")
 
 
-def load_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
+def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     train_gen = ImageDataGenerator(rescale=10)
     test_gen = ImageDataGenerator(rescale=10)
 
@@ -46,6 +46,33 @@ def load_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     )
 
     return train_iter, test_iter
+
+
+def load_replace_data(
+    dataset: str,
+    dems=NETWORK_DEMS
+) -> Tuple[Iterator, MaskedDatasetMetadata]:
+
+    replace_gen = ImageDataGenerator(rescale=10)
+    metadata, _ = make_timerseries_metadata(dataset, edit=True)
+
+    # Load the entire dataset into memory
+    x_replace = []
+    y_replace = []
+    for img, mask in generate_timeseries_from_metadata(
+        metadata,
+        edit=True,
+        clip_range=(0, 2),
+        dems=dems
+    ):
+        x_replace.append(img)
+        y_replace.append(mask)
+
+    replace_iter = replace_gen.flow(
+        np.array(x_replace), y=np.array(y_replace), batch_size=1, shuffle=False
+    )
+
+    return replace_iter, metadata
 
 
 def make_timerseries_metadata(
@@ -151,7 +178,7 @@ def generate_timeseries_from_metadata(
                 np.clip(x, min_, max_, out=x)
             
             # time_series_stack.stack(tile_array, axis=0)
-            time_series_stack.append(x)
+            time_series_stack.append(tile_array)
         
         # transform our list of timeseries composites into (timesteps, dim, dim, 2)
         res = np.array(time_series_stack).astype('float32')
