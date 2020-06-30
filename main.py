@@ -16,6 +16,7 @@ from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
 from src.plots import edit_predictions, plot_predictions
 
+from src.model.architecture.crop_masked import create_cdl_model_masked
 
 def train_wrapper(args: Namespace) -> None:
     """ Function for training a network. """
@@ -29,7 +30,8 @@ def train_wrapper(args: Namespace) -> None:
             print(f"File {model_name} already exists!")
             return
 
-        model = create_model_masked(model_name)
+        # model = create_model_masked(model_name)
+        model = create_cdl_model_masked(model_name)
         history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": []}
 
     train_model(model, history, args.dataset, args.epochs)

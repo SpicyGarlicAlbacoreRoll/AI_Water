@@ -85,47 +85,47 @@ def make_timerseries_metadata(
     test_metadata = []
 
     for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
-        for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(os.join(dirpath, dirnames)):
-            
-            time_series_data = []
-            timeseries_mask = ""
-            
-            for name in sorted(timeseries_filenames):
-                m = re.match(TILE_REGEX, name)
-                if not m:
-                    continue
-                
+        for data_dir in dirnames:
+            for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(os.path.join(dirpath, data_dir)):
+                time_series_data = []
+                timeseries_mask = ""
+                crop_mask_path = ""
+                for name in sorted(timeseries_filenames):
+                    m = re.match(TILE_REGEX, name)
+                    if not m:
+                        continue
+                    
 
-                pre, end, ext = m.groups()
-    
-                # mask = f"{pre}.mask{end}.{ext}"
-                crop_mask_file = re.search("mask", name)
+                    pre, end, ext = m.groups()
+        
+                    # mask = f"{pre}.mask{end}.{ext}"
+                    crop_mask_file = re.search("mask", name)
 
-                if crop_mask_file:
-                    crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
-                
-                vh_name = f"{pre}.vh{end}.{ext}"
-                vv_name = f"{pre}.vv{end}.{ext}"
-    
-                data = (
-                    os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
-                    )
-                
-                time_series_data.append(data)
+                    if crop_mask_file:
+                        crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
+                    
+                    vh_name = f"{pre}.vh{end}.{ext}"
+                    vv_name = f"{pre}.vv{end}.{ext}"
+        
+                    data = (
+                        os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
+                        )
+                    
+                    time_series_data.append(data)
 
-            # each data point is a list of time series vv + vh pairs with corresponding cropland masks
-            data = (time_series_data, crop_mask_path)
+                # each data point is a list of time series vv + vh pairs with corresponding cropland masks
+                data = (time_series_data, crop_mask_path)
 
-            folder = os.path.basename(dirpath)
-    
-            if edit:
-                if folder == 'test' or folder == 'train':
-                    train_metadata.append(data)
-            else:
-                if folder == 'train':
-                    train_metadata.append(data)
-                elif folder == 'test':
-                    test_metadata.append(data)
+                folder = os.path.basename(dirpath)
+        
+                if edit:
+                    if folder == 'test' or folder == 'train':
+                        train_metadata.append(data)
+                else:
+                    if folder == 'train':
+                        train_metadata.append(data)
+                    elif folder == 'test':
+                        test_metadata.append(data)
 
     return train_metadata, test_metadata
 
