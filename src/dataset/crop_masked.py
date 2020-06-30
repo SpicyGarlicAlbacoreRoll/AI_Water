@@ -17,7 +17,7 @@ from .common import dataset_dir, valid_image
 from ..config import NETWORK_DEMS, TIMESTEPS
 
 TILE_REGEX = re.compile(r"(.*)\.vh(.*)\.(tiff|tif|TIFF|TIF)")
-
+TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH\.(tiff|tif|TIFF|TIF)")
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     train_gen = ImageDataGenerator(rescale=10)
@@ -86,27 +86,33 @@ def make_timerseries_metadata(
 
     for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
         for data_dir in dirnames:
+            print(data_dir)
             for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(os.path.join(dirpath, data_dir)):
+                # print(timeseries_filenames)
                 time_series_data = []
                 timeseries_mask = ""
                 crop_mask_path = ""
                 for name in sorted(timeseries_filenames):
-                    m = re.match(TILE_REGEX, name)
-                    if not m:
-                        continue
-                    
-
-                    pre, end, ext = m.groups()
-        
-                    # mask = f"{pre}.mask{end}.{ext}"
+                    # print(name)
                     crop_mask_file = re.search("mask", name)
 
                     if crop_mask_file:
                         crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
+
+                    # skip to avoid double composite pair
+                    m = re.match(TITLE_TIME_SERIES_REGEX, name)
+                    if not m:
+                        continue
                     
-                    vh_name = f"{pre}.vh{end}.{ext}"
-                    vv_name = f"{pre}.vv{end}.{ext}"
+
+                    pre, ext = m.groups()
         
+                    # mask = f"{pre}.mask{end}.{ext}"
+                    
+                    
+                    vh_name = f"{pre}_VH.{ext}"
+                    vv_name = f"{pre}_VV.{ext}"
+                    print(vh_name + "\t" + vv_name)
                     data = (
                         os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
                         )
@@ -115,7 +121,8 @@ def make_timerseries_metadata(
 
                 # each data point is a list of time series vv + vh pairs with corresponding cropland masks
                 data = (time_series_data, crop_mask_path)
-
+                # print(data)
+                # print("\n")
                 folder = os.path.basename(dirpath)
         
                 if edit:
@@ -126,7 +133,10 @@ def make_timerseries_metadata(
                         train_metadata.append(data)
                     elif folder == 'test':
                         test_metadata.append(data)
-
+                    else:
+                        print(folder)
+    print(train_metadata)
+    print(test_metadata)
     return train_metadata, test_metadata
 
 
@@ -187,4 +197,5 @@ def generate_timeseries_from_metadata(
             mask_array = f.ReadAsArray()
             y = np.array(mask_array).astype('float32')
     
+        print("OUTPUT:\t" + output_shape)
         yield (res.reshape(output_shape), y.reshape(mask_output_shape))
