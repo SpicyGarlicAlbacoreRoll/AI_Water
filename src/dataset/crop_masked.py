@@ -27,6 +27,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # Load the entire dataset into memory
     x_train = []
     y_train = []
+    print("\nTrain metadata mask")
+    print(train_metadata)
+    print("\nTest metadata mask")
+    print(test_metadata)
     for img, mask in generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2)):
         x_train.append(img)
         y_train.append(mask)
@@ -84,59 +88,56 @@ def make_timerseries_metadata(
     train_metadata = []
     test_metadata = []
 
-    for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
-        for data_dir in dirnames:
-            print(data_dir)
-            for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(os.path.join(dirpath, data_dir)):
-                # print(timeseries_filenames)
-                time_series_data = []
-                timeseries_mask = ""
-                crop_mask_path = ""
-                for name in sorted(timeseries_filenames):
-                    # print(name)
-                    crop_mask_file = re.search("mask", name)
+    for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)): #for folders in new_test_set
+        for data_dir in dirnames:   #for folders in dataset
+            if data_dir == 'test' or data_dir == 'train':
+                for idx, (timeseries_path, _, timeseries_filenames) in enumerate(os.walk(os.path.join(dirpath, data_dir))):
+                    print("FFFFFFFFFFFF", _)
+                    time_series_data = []
+                    timeseries_mask = ""
+                    crop_mask_path = ""
+                    for name in sorted(timeseries_filenames):
+                        # print(name)
+                        crop_mask_file = re.search("mask.tif", name)
 
-                    if crop_mask_file:
-                        crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
+                        if crop_mask_file:
+                            crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
 
-                    # skip to avoid double composite pair
-                    m = re.match(TITLE_TIME_SERIES_REGEX, name)
-                    if not m:
-                        continue
-                    
+                        # skip to avoid double composite pair
+                        m = re.match(TITLE_TIME_SERIES_REGEX, name)
+                        if not m:
+                            continue
+                        
 
-                    pre, ext = m.groups()
-        
-                    # mask = f"{pre}.mask{end}.{ext}"
-                    
-                    
-                    vh_name = f"{pre}_VH.{ext}"
-                    vv_name = f"{pre}_VV.{ext}"
-                    print(vh_name + "\t" + vv_name)
-                    data = (
-                        os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
-                        )
-                    
-                    time_series_data.append(data)
+                        pre, ext = m.groups()
 
-                # each data point is a list of time series vv + vh pairs with corresponding cropland masks
-                data = (time_series_data, crop_mask_path)
-                # print(data)
-                # print("\n")
-                folder = os.path.basename(dirpath)
-        
-                if edit:
-                    if folder == 'test' or folder == 'train':
-                        train_metadata.append(data)
-                else:
-                    if folder == 'train':
-                        train_metadata.append(data)
-                    elif folder == 'test':
-                        test_metadata.append(data)
-                    else:
-                        print(folder)
-    print(train_metadata)
-    print(test_metadata)
+                        # mask = f"{pre}.mask{end}.{ext}"
+
+
+                        vh_name = f"{pre}_VH.{ext}"
+                        vv_name = f"{pre}_VV.{ext}"
+                        # print(vh_name + "\t" + vv_name)
+                        data_frame = (
+                            os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
+                            )
+
+                        time_series_data.append(data_frame)
+
+                    # each data point is a list of time series vv + vh pairs with corresponding cropland masks
+                    data = (time_series_data, crop_mask_path)
+                    folder = os.path.basename(data_dir)
+
+                    if crop_mask_path != '':
+                        if edit:
+                            if folder == 'test' or folder == 'train':
+                                train_metadata.append(data)
+                        else:
+                            if folder == 'train':
+                                # print("Appended to train_metadata\t", data)
+                                train_metadata.append(data)
+                            elif folder == 'test':
+                                test_metadata.append(data)
+
     return train_metadata, test_metadata
 
 
@@ -151,7 +152,7 @@ def generate_timeseries_from_metadata(
     output_shape = (timesteps, dems, dems, 2)
     mask_output_shape = (dems, dems, 1)
     for time_series, mask_name in metadata:
-
+        print(mask_name)
         time_series_stack = []
 
         # iterate through vv vh image pairs, make a composite, and append them to our list
@@ -197,5 +198,5 @@ def generate_timeseries_from_metadata(
             mask_array = f.ReadAsArray()
             y = np.array(mask_array).astype('float32')
     
-        print("OUTPUT:\t" + output_shape)
-        yield (res.reshape(output_shape), y.reshape(mask_output_shape))
+        print("OUTPUT:\t", res)
+        yield (res.reshape(res), y.reshape(mask_output_shape))
