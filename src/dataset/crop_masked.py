@@ -157,14 +157,24 @@ def generate_timeseries_from_metadata(
 
         # iterate through vv vh image pairs, make a composite, and append them to our list
         for tile_vh, tile_vv in time_series:
+            # print(tile_vh + "\n" + tile_vv)
             tif_vh = gdal.Open(tile_vh)
-
+            if(tif_vh):
+                print("vh tif found")
+                print(tif_vh.RasterXSize)
             # Should prevent the following error
             # ValueError: cannot reshape array of size 524288 into shape (64,64,2)
             comp = str(tif_vh.RasterXSize)
-            if(comp != str(dems) and "mock" not in comp):
-                # mock is include for the unit tests
-                continue
+            compositeIsDems = comp != str(dems)
+            mockNotInComp = "mock" not in comp
+            # if compositeIsDems and mockNotInComp:
+            # # if(comp != str(dems) and "mock" not in comp):
+            #     # mock is include for the unit tests
+            #     print(compositeIsDems, "\t", mockNotInComp)
+            #     continue
+            tile_vh_array = []
+            tile_vv_array = []
+
             try:
                 with gdal_open(tile_vh) as f:
                     tile_vh_array = f.ReadAsArray()
@@ -176,11 +186,13 @@ def generate_timeseries_from_metadata(
             except FileNotFoundError:
                 continue
 
+            print("tiling array")
             tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
-
-            if not edit:
-                if not valid_image(tile_array):
-                    continue
+            print("composite length", len(tile_array))
+            # if not edit:
+            #     if not valid_image(tile_array):
+            #         print("ERROR: not valid image")
+            #         continue
 
             x = np.array(tile_array).astype('float32')
             # Clip all x values to a fixed range
@@ -189,14 +201,15 @@ def generate_timeseries_from_metadata(
                 np.clip(x, min_, max_, out=x)
             
             # time_series_stack.stack(tile_array, axis=0)
-            time_series_stack.append(tile_array)
+            time_series_stack.append(x)
         
         # transform our list of timeseries composites into (timesteps, dim, dim, 2)
-        res = np.array(time_series_stack).astype('float32')
+        print(len(time_series_stack))
+        res = np.array(time_series_stack)
 
         with gdal_open(mask_name) as f:
             mask_array = f.ReadAsArray()
             y = np.array(mask_array).astype('float32')
     
         print("OUTPUT:\t", res)
-        yield (res.reshape(res), y.reshape(mask_output_shape))
+        yield (res.reshape(output_shape), y.reshape(mask_output_shape))
