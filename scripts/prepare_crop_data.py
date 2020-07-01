@@ -1,4 +1,4 @@
-# prepare_data.py
+# prepare_crop_data.py
 # command line sample:
 # python3 scripts/prepare_data.py sar/SAR_UT_VV.tif
 
