@@ -199,17 +199,19 @@ def generate_timeseries_from_metadata(
             if clip_range:
                 min_, max_ = clip_range
                 np.clip(x, min_, max_, out=x)
-            
+            x.reshape(tif_vh.RasterXSize, tif_vh.RasterYSize, 2)
+            print(x.shape)
             # time_series_stack.stack(tile_array, axis=0)
             time_series_stack.append(x)
         
         # transform our list of timeseries composites into (timesteps, dim, dim, 2)
         print(len(time_series_stack))
-        res = np.array(time_series_stack)
-
+        res = np.stack(time_series_stack, axis=0)
+        # print(res.shape())
+        print(res.shape)
         with gdal_open(mask_name) as f:
             mask_array = f.ReadAsArray()
             y = np.array(mask_array).astype('float32')
     
-        print("OUTPUT:\t", res)
-        yield (res.reshape(output_shape), y.reshape(mask_output_shape))
+        # print("OUTPUT:\t", res)
+        yield (res, y.reshape(mask_output_shape))
