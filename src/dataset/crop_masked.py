@@ -94,8 +94,10 @@ def make_timerseries_metadata(
                 for idx, (timeseries_path, _, timeseries_filenames) in enumerate(os.walk(os.path.join(dirpath, data_dir))):
                     print("FFFFFFFFFFFF", _)
                     time_series_data = []
+                    tile_time_series_data = []
                     timeseries_mask = ""
                     crop_mask_path = ""
+                    data = []
                     for name in sorted(timeseries_filenames):
                         # print(name)
                         crop_mask_file = re.search("mask.tif", name)
@@ -104,27 +106,44 @@ def make_timerseries_metadata(
                             crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
 
                         # skip to avoid double composite pair
-                        m = re.match(TITLE_TIME_SERIES_REGEX, name)
+                        m = re.match(TILE_REGEX, name)
                         if not m:
                             continue
                         
 
-                        pre, ext = m.groups()
+                        pre, end, ext = m.groups()
 
-                        # mask = f"{pre}.mask{end}.{ext}"
+                        # Need this for tiled masks
+                        mask = f"{pre}.mask{end}.{ext}"
 
+                        vh_name = f"{pre}.VH{end}.{ext}"
+                        vv_name = f"{pre}.VV{end}.{ext}"
 
-                        vh_name = f"{pre}_VH.{ext}"
-                        vv_name = f"{pre}_VV.{ext}"
-                        # print(vh_name + "\t" + vv_name)
-                        data_frame = (
-                            os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
+                        # grab every string with matching tile index for vv and vh tiles
+                        tile_time_series_data = (
+                            [tile for tile in sorted(timeseries_filenames) if re.match(fr"(.*)\.VH{end}\.(.*)", tile)],
+                            [tile for tile in sorted(timeseries_filenames) if re.match(fr"(.*)\.VV{end}\.(.*)", tile)],
                             )
 
-                        time_series_data.append(data_frame)
+                        # tuple (vv+vh list, mask)
+                        data_frame = (
+                            tile_time_series_data, mask
+                        )
 
+                        data.append(data_frame)
+                        # vh_name = f"{pre}_VH.{ext}"
+                        # vv_name = f"{pre}_VV.{ext}"
+                        # print(vh_name + "\t" + vv_name)
+                        # data_frame = (
+                        #     os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
+                        #     )
+
+                        # time_series_data.append(data_frame)
+                        # tile_time_series_data.append(data_frame)
+                    
                     # each data point is a list of time series vv + vh pairs with corresponding cropland masks
-                    data = (time_series_data, crop_mask_path)
+                    # data = (time_series_data, crop_mask_path)
+
                     folder = os.path.basename(data_dir)
 
                     if crop_mask_path != '':
