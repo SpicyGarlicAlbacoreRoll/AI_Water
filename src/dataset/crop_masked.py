@@ -17,7 +17,8 @@ from .common import dataset_dir, valid_image
 from ..config import NETWORK_DEMS, TIMESTEPS
 
 TILE_REGEX = re.compile(r"(.*)\.vh(.*)\.(tiff|tif|TIFF|TIF)")
-TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH\.(tiff|tif|TIFF|TIF)")
+TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
+# TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH\.(tiff|tif|TIFF|TIF)")
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     train_gen = ImageDataGenerator(rescale=10)
@@ -94,23 +95,23 @@ def make_timerseries_metadata(
                 for idx, (timeseries_path, _, timeseries_filenames) in enumerate(os.walk(os.path.join(dirpath, data_dir))):
                     print("FFFFFFFFFFFF", _)
                     time_series_data = []
-                    tile_time_series_data = []
+                    # tile_time_series_data = []
                     timeseries_mask = ""
                     crop_mask_path = ""
                     data = []
                     for name in sorted(timeseries_filenames):
-                        # print(name)
+                        tile_time_series_data = []
                         crop_mask_file = re.search("mask.tif", name)
 
                         if crop_mask_file:
                             crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
 
                         # skip to avoid double composite pair
-                        m = re.match(TILE_REGEX, name)
+                        m = re.match(TITLE_TIME_SERIES_REGEX, name)
                         if not m:
                             continue
                         
-
+                        # print(name)
                         pre, end, ext = m.groups()
 
                         # Need this for tiled masks
@@ -118,17 +119,29 @@ def make_timerseries_metadata(
 
                         vh_name = f"{pre}.VH{end}.{ext}"
                         vv_name = f"{pre}.VV{end}.{ext}"
-
+                        # print(vh_name)
                         # grab every string with matching tile index for vv and vh tiles
-                        tile_time_series_data = (
-                            [tile for tile in sorted(timeseries_filenames) if re.match(fr"(.*)\.VH{end}\.(.*)", tile)],
-                            [tile for tile in sorted(timeseries_filenames) if re.match(fr"(.*)\.VV{end}\.(.*)", tile)],
-                            )
+                        temp = [
+                            tileVV for tileVV in sorted(timeseries_filenames)
+                            if re.match(fr"(.*)\_VH{end}\.(.*)", tileVV)
+                            ]
 
+                        for tileVV in temp:
+                            tile_time_series_data.append(
+                                (
+                                os.path.join(dirpath, timeseries_path, tileVV), 
+                                os.path.join(dirpath, timeseries_path, tileVV.replace("VH", "VV"))
+                                )
+                                )
+                        
+                        # os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
+                        
                         # tuple (vv+vh list, mask)
                         data_frame = (
-                            tile_time_series_data, mask
+                            tile_time_series_data, os.path.join(dirpath, timeseries_path, mask)
                         )
+
+                        # print(data_frame)
 
                         data.append(data_frame)
                         # vh_name = f"{pre}_VH.{ext}"
@@ -145,7 +158,7 @@ def make_timerseries_metadata(
                     # data = (time_series_data, crop_mask_path)
 
                     folder = os.path.basename(data_dir)
-
+                    print(sorted(data))
                     if crop_mask_path != '':
                         if edit:
                             if folder == 'test' or folder == 'train':
