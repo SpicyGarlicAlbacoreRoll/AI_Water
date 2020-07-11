@@ -95,21 +95,23 @@ def make_timerseries_metadata(
     # for folders in new_test_set
     for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
         for data_dir in dirnames:  # for folders in dataset
+            print(data_dir)
             if data_dir == 'test' or data_dir == 'train':
                 for idx, (timeseries_path, _, timeseries_filenames) in enumerate(os.walk(os.path.join(dirpath, data_dir))):
                     # Os Walk will create empty _ folder path if folder is empty
                     if(not _):
                         print("FFFFFFFFFFFF", _)
+                        print(timeseries_path)
                         time_series_data = []
+                        print(timeseries_filenames[0])
                         # tile_time_series_data = []
                         timeseries_mask = ""
                         crop_mask_path = ""
                         data = []
                         frames = []
-                        print(timeseries_filenames)
-                        for idy, name in enumerate(sorted(timeseries_filenames)):
-                            # print(name)
+                        for idy, (dataset_path, tile_dir, name) in enumerate(os.walk(os.path.join(timeseries_path, data_dir))):
                             tile_time_series_data = []
+                            print(idy)
                             crop_mask_file = re.search("mask.tif", name)
 
                             if crop_mask_file:
@@ -121,7 +123,6 @@ def make_timerseries_metadata(
                             if not m:
                                 continue
 
-                            # print(name)
                             pre, end, ext = m.groups()
                             # if idx == 0:
 
@@ -131,7 +132,7 @@ def make_timerseries_metadata(
                             vh_name = f"{pre}_VH{end}.{ext}"
                             vv_name = f"{pre}_VV{end}.{ext}"
                             frame = end
-                            # print(vh_name)
+
                             # grab every string with matching tile index for vv and vh tiles, ignoring repeats
                             VV_Tiles = []
                             if frame not in frames:
@@ -143,8 +144,6 @@ def make_timerseries_metadata(
                             else:
                                 break
 
-                            # if idx == 1:
-                            #     print(temp)
                             for tileVV in VV_Tiles:
                                 tile_time_series_data.append(
                                     (
@@ -194,6 +193,7 @@ def generate_timeseries_from_metadata(
     # for time stacks           Tuple(List[Tuple(Str, Str)], Str)
     if(len(metadata) == 0):
         print("Empty Object passed")
+        print(metadata)
     
     for time_series_mask_pair in metadata:
         # print(time_series_mask_pair)
