@@ -26,7 +26,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     train_gen = ImageDataGenerator(rescale=10)
     test_gen = ImageDataGenerator(rescale=10)
 
-    train_metadata, test_metadata = make_timerseries_metadata(dataset)
+    train_metadata, test_metadata = make_timeseries_metadata(dataset)
     # Load the entire dataset into memory
     x_train = []
     y_train = []
@@ -62,7 +62,7 @@ def load_replace_data(
 ) -> Tuple[Iterator, MaskedDatasetMetadata]:
 
     replace_gen = ImageDataGenerator(rescale=10)
-    metadata, _ = make_timerseries_metadata(dataset, edit=True)
+    metadata, _ = make_timeseries_metadata(dataset, edit=True)
 
     # Load the entire dataset into memory
     x_replace = []
@@ -83,7 +83,7 @@ def load_replace_data(
     return replace_iter, metadata
 
 
-def make_timerseries_metadata(
+def make_timeseries_metadata(
     dataset: str,
     edit: bool = False
 ) -> Tuple[MaskedTimeseriesMetadata, MaskedTimeseriesMetadata]:
@@ -92,90 +92,78 @@ def make_timerseries_metadata(
     train_metadata = []
     test_metadata = []
 
-    # for folders in new_test_set
-    for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
-        for data_dir in dirnames:  # for folders in dataset
-            print(data_dir)
-            if data_dir == 'test' or data_dir == 'train':
-                for idx, (timeseries_path, _, timeseries_filenames) in enumerate(os.walk(os.path.join(dirpath, data_dir))):
-                    # Os Walk will create empty _ folder path if folder is empty
-                    if(not _):
-                        print("FFFFFFFFFFFF", _)
-                        print(timeseries_path)
-                        time_series_data = []
-                        print(timeseries_filenames[0])
-                        # tile_time_series_data = []
-                        timeseries_mask = ""
-                        crop_mask_path = ""
-                        data = []
-                        frames = []
-                        for idy, (dataset_path, tile_dir, name) in enumerate(os.walk(os.path.join(timeseries_path, data_dir))):
-                            tile_time_series_data = []
-                            print(idy)
-                            crop_mask_file = re.search("mask.tif", name)
+    dirs = ["train", "test"]
 
-                            if crop_mask_file:
-                                crop_mask_path = os.path.join(
-                                    dirpath, timeseries_path, crop_mask_file.group())
+    #expectation that train and test will be root dataset directories
+    for data_dir in dirs:
+        for timeseries_path, timeseries_dirs, timeseries_files in os.walk(os.path.join(dataset_dir(dataset), data_dir)):
+            for file_dir in timeseries_dirs:
+                for data_point_path, _, files in os.walk(os.path.join(timeseries_path, file_dir)):
+                    # print(files)
+                    print(data_point_path)
 
-                            # skip to avoid double composite pair
-                            m = re.match(TITLE_TIME_SERIES_REGEX, name)
-                            if not m:
-                                continue
+                    # our list of time series frames + masks that will be appended to test and train metadata
+                    data = []
+                    
+                    # keep track of frames that have already been stacked
+                    frames = []
+                    
+                    for tile_name in files:
+                        m = re.match(TITLE_TIME_SERIES_REGEX, tile_name)
+                        if not m:
+                            continue
+                        
+                        pre, end, ext = m.groups()
+                        
+                        tile_time_series_data = []
+                        frame_index = end
+                        VV_Tiles = []
+                        
+                        # If we've already gotten a time stack of this frame index, skip
+                        if frame_index not in frames:
+                            VV_Tiles = [
+                                tileVV for tileVV in sorted(files)
+                                if re.match(fr"(.*)\_VV{end}\.(tif|tiff)", tileVV)
+                            ]
+                            frames.append(end)
+                        else:
+                            continue
 
-                            pre, end, ext = m.groups()
-                            # if idx == 0:
+                        # for testing purposes
+                        mask_name = f"{pre}_VH{end}.{ext}"
 
-                            # Need this for tiled masks
-                            mask = f"{pre}_VH{end}.{ext}"
-
-                            vh_name = f"{pre}_VH{end}.{ext}"
-                            vv_name = f"{pre}_VV{end}.{ext}"
-                            frame = end
-
-                            # grab every string with matching tile index for vv and vh tiles, ignoring repeats
-                            VV_Tiles = []
-                            if frame not in frames:
-                                VV_Tiles = [
-                                    tileVV for tileVV in sorted(timeseries_filenames)
-                                    if re.match(fr"(.*)\_VV{end}\.(tif|tiff)", tileVV)
-                                ]
-                                frames.append(end)
-                            else:
-                                break
-
-                            for tileVV in VV_Tiles:
-                                tile_time_series_data.append(
-                                    (
-                                        os.path.join(
-                                            dirpath, timeseries_path, tileVV),
-                                        os.path.join(
-                                            dirpath, timeseries_path, tileVV.replace("VV", "VH"))
+                        # Get VV VH Pair
+                        for tileVV in VV_Tiles:
+                            tile_time_series_data.append(
+                                (
+                                    os.path.join(
+                                        timeseries_path, file_dir, tileVV
+                                    ),
+                                    os.path.join(
+                                        timeseries_path, file_dir, tileVV.replace("VV", "VH"))
                                     )
                                 )
-
-                            # os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
-
-                            # tuple (vv+vh list, mask)
-                            data_frame = (
-                                tile_time_series_data, os.path.join(
-                                    dirpath, timeseries_path, vh_name)
+                            
+                        # The timestack with mask tuple(list(tuple(vv, vh)), mask)
+                        data_frame = (
+                                tile_time_series_data, 
+                                os.path.join (
+                                    timeseries_path, file_dir, mask_name
+                                )
                             )
 
-                            data.append(data_frame)
-                        folder = os.path.basename(data_dir)
+                        data.append(data_frame)
 
-                        if crop_mask_path != '':
-                            if edit:
-                                if folder == 'test' or folder == 'train':
-                                    train_metadata.append(data)
-                            else:
-                                if folder == 'train':
-                                    print("TRAINING FOLDER")
-                                    train_metadata.append(data)
-                                elif folder == 'test':
-                                    print("TESTING FOLDER")
-                                    test_metadata.append(data)
+                    if edit:
+                        if data_dir == 'test' or data_dir == 'train':
+                            train_metadata.append(data)
+                    else:
+                        if data_dir == 'train':
+                            print("training:\t", data[0])
+                            train_metadata.append(data)
+                        elif data_dir == 'test':
+                            print("testing:\t", data[0])
+                            test_metadata.append(data)
 
     return train_metadata, test_metadata
 
@@ -195,17 +183,17 @@ def generate_timeseries_from_metadata(
         print("Empty Object passed")
         print(metadata)
     
-    for time_series_mask_pair in metadata:
+    # for time_series_mask_pair in metadata:
         # print(time_series_mask_pair)
         # print("\n\n")
-        for time_series, mask in time_series_mask_pair:
-            print("MASK:\t", mask)
+        # for time_series, mask in time_series_mask_pair:
+            # print("MASK:\t", mask)
 
-            print("*********************************************")
-            for vv_tile, vh_tile in time_series:
-                print("\t", vv_tile, "\n\t", vh_tile)
+            # print("*********************************************")
+            # for vv_tile, vh_tile in time_series:
+                # print("\t", vv_tile, "\n\t", vh_tile)
             
-            print("*********************************************\n")
+            # print("*********************************************\n")
     # for stack in metadata[0]:
     #     print(len(metadata))
     #     print("\n")
