@@ -33,7 +33,7 @@ URL = f"https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile?year=20
 print('\nGo to this website and copy the tif file url it gives you: ')
 print(URL)
 print('\nRun the following command, then check your Downloads folder. It may take up to 15 minutes. ')
-print('docker run --rm -v ~/Downloads:/root/Dowloads ubuntu:18.04 /bin/bash -c "apt-get update -y && apt-get install -y wget; wget <copied_url.tif> -P ~/Downloads/" ')
+print('docker run --rm -v ~/Downloads:/root/Downloads ubuntu:18.04 /bin/bash -c "apt-get update -y && apt-get install -y wget; wget <copied_url.tif> -P ~/Downloads/" ')
 print('\nName your file something meaningful, then put it in a meaningful folder.')
 print('Use crop_crop.py to crop and reproject the CDL data to the RTC granule of your choice.')
 print('Use crop_mask10.py to filter CDL data into "crop" and "not crop" categories. ')
