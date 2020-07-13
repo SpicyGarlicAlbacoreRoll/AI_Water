@@ -47,7 +47,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # test_gen = TimeseriesGenerator()
 
     train_iter = train_gen.flow(
-        x=x_train, y=y_train, batch_size=16
+        x=x_train, y=y_train, batch_size=1
     )
     test_iter = test_gen.flow(
         np.array(x_test), y=np.array(y_test), batch_size=1, shuffle=False
@@ -178,88 +178,48 @@ def generate_timeseries_from_metadata(
     """ Yield training images and masks from the given metadata. """
     output_shape = (timesteps, dems, dems, 2)
     mask_output_shape = (dems, dems, 1)
-    # for time stacks           Tuple(List[Tuple(Str, Str)], Str)
-    if(len(metadata) == 0):
-        print("Empty Object passed")
-        print(metadata)
     
-    # for time_series_mask_pair in metadata:
-        # print(time_series_mask_pair)
-        # print("\n\n")
-        # for time_series, mask in time_series_mask_pair:
-            # print("MASK:\t", mask)
+    for time_series_mask_pairs in metadata:
+        for time_series, mask in time_series_mask_pairs:
+            print("MASK:\t", mask)
+            time_stack = []
 
-            # print("*********************************************")
-            # for vv_tile, vh_tile in time_series:
-                # print("\t", vv_tile, "\n\t", vh_tile)
+            for tileVH, tileVV in sorted(time_series):
+                tif_vh = gdal.Open(tileVH)
+
+                comp = str(tif_vh.RasterXSize)
+                if(comp != str(dems) and "mock" not in comp):
+                    continue
+                try:
+                    with gdal_open(tileVH) as f:
+                        tile_vh_array = f.ReadAsArray()
+                except FileNotFoundError:
+                    continue
+                try:
+                    with gdal_open(tileVV) as f:
+                        tile_vv_array = f.ReadAsArray()
+                except FileNotFoundError:
+                    continue
+
+                tile_array = np.stack((tile_vh_array, tile_vv_array), axis = 2)
+
+                # if not edit:
+                #     if not valid_image(tile_array):
+                #         continue
+                
+                x = np.array(tile_array).astype('float32')
+
+                if clip_range:
+                    min_, max_ = clip_range
+                    np.clip(x, min_, max_, out=x)
+
+                time_stack.append(x)
             
-            # print("*********************************************\n")
-    # for stack in metadata[0]:
-    #     print(len(metadata))
-    #     print("\n")
-    #     mask_name = stack[1]
-    #     print("mask_name:\t", mask_name)
-    #     # z = input()
-    #     #for time stack and corresponding mask              List[Tuple(Str, Str)]
-    #     for time_series in stack[0]:
-    #         # print(mask_name)
-    #         print(time_series)
-
-    #         mask = ''
-    #         time_series_stack = []
-
-    #         # for vv and vh tile                Tuple(Str, Str)
-    #     # for tile_vh, tile_vv in time_series:
-    #         tile_vv = time_series[0]
-    #         tile_vh = time_series[1]
-    #         tile_vh_as_array = []
-    #         tile_vv_as_array = []
-
-    #         tif_vh = gdal.Open(tile_vh)
-
-    #         # Should prevent the following error
-    #         # ValueError: cannot reshape array of size 524288 into shape (dem,dem,2)
-    #         comp = str(tif_vh.RasterXSize)
-
-    #         # if compositeIsDems and mockNotInComp:
-    #         if(comp != str(dems) and "mock" not in comp):
-    #             # mock is include for the unit tests
-    #             # print(compositeIsDems, "\t", mockNotInComp)
-    #             continue
-
-
-    #         try:
-    #             with gdal_open(tile_vh) as f:
-    #                 tile_vh_as_array = f.ReadAsArray()
-    #         except FileNotFoundError:
-    #             continue
-    #         try:
-    #             with gdal_open(tile_vv) as f:
-    #                 tile_vv_as_array = f.ReadAsArray()
-    #         except FileNotFoundError:
-    #             continue
-
-    #         print("tiling array")
-    #         tile_array = np.stack((tile_vh_as_array, tile_vv_as_array), axis=2)
-    #         # print("composite length", len(tile_array))
-    #         # if not edit:
-    #         #     if not valid_image(tile_array):
-    #         #         print("ERROR: not valid image")
-    #         #         continue
-
-    #         x = np.array(tile_array).astype('float32')
-    #         # Clip all x values to a fixed range
-    #         if clip_range:
-    #             min_, max_ = clip_range
-    #             np.clip(x, min_, max_, out=x)
-
-    #         time_series_stack.append(x)
-
-    #         with gdal_open(mask_name) as f:
-    #             mask_array = f.ReadAsArray()
-    #             y = np.array(mask_array).astype('float32')
-
-    #         print(y.shape)
-    #         # y = np.expand_dims(y, axis=0)
-    #         print("y expanded shape:\t", y.shape)
-    #         yield (np.array(time_series_stack), y.reshape(mask_output_shape))
+            if len(time_stack) != 0:
+                x_stack = np.stack(time_stack, axis=0)
+                print(x_stack.shape)
+                with gdal_open(mask) as f:
+                    mask_array = f.ReadAsArray()
+            
+                y = np.array(mask_array).astype('float32')
+                yield (x_stack, y.reshape(mask_output_shape))
