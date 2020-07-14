@@ -23,8 +23,8 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
-    train_gen = ImageDataGenerator(rescale=10)
-    test_gen = ImageDataGenerator(rescale=10)
+    # train_gen = ImageDataGenerator(rescale=10)
+    # test_gen = ImageDataGenerator(rescale=10)
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
     # Load the entire dataset into memory
@@ -45,17 +45,17 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # https://stackoverflow.com/questions/58948739/reshaping-images-for-input-into-keras-timedistributed-function
     # train_gen = TimeseriesGenerator()
     # test_gen = TimeseriesGenerator()
+    print(x_test[0].shape)
+    train_gen = TimeseriesGenerator(x_train, y_train, 1)
+    test_gen = TimeseriesGenerator(x_test, y_test, 1)
+    # train_iter = train_gen.flow(
+    #     x=x_train, y=y_train, batch_size=1
+    # )
+    # test_iter = test_gen.flow(
+    #     x_test, y=y_test, batch_size=1, shuffle=False
+    # )
 
-    # train_gen = TimeseriesGenerator(x_train,)
-
-    train_iter = train_gen.flow(
-        x=x_train, y=y_train, batch_size=1
-    )
-    test_iter = test_gen.flow(
-        x_test, y=y_test, batch_size=1, shuffle=False
-    )
-
-    return train_iter, test_iter
+    return train_gen, test_gen
 
 
 def load_replace_data(
@@ -204,9 +204,9 @@ def generate_timeseries_from_metadata(
 
                 tile_array = np.stack((tile_vh_array, tile_vv_array), axis = 2)
 
-                # if not edit:
-                #     if not valid_image(tile_array):
-                #         continue
+                if not edit:
+                    if not valid_image(tile_array):
+                        continue
                 
                 x = np.array(tile_array).astype('float32')
 
