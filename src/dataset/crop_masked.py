@@ -30,15 +30,15 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # Load the entire dataset into memory
     x_train = []
     y_train = []
-    for img, mask in generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2)):
-        x_train.append(img)
+    for time_stack, mask in generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2)):
+        x_train.append(time_stack)
         y_train.append(mask)
 
     x_test = []
     y_test = []
-    print(test_metadata)
-    for img, mask in generate_timeseries_from_metadata(test_metadata, clip_range=(0, 2)):
-        x_test.append(img)
+    # print(test_metadata)
+    for time_stack, mask in generate_timeseries_from_metadata(test_metadata, clip_range=(0, 2)):
+        x_test.append(time_stack)
         y_test.append(mask)
 
     # Needed to work with Time Distributed Layers
@@ -46,11 +46,13 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # train_gen = TimeseriesGenerator()
     # test_gen = TimeseriesGenerator()
 
+    # train_gen = TimeseriesGenerator(x_train,)
+
     train_iter = train_gen.flow(
         x=x_train, y=y_train, batch_size=1
     )
     test_iter = test_gen.flow(
-        np.array(x_test), y=np.array(y_test), batch_size=1, shuffle=False
+        x_test, y=y_test, batch_size=1, shuffle=False
     )
 
     return train_iter, test_iter
@@ -181,7 +183,6 @@ def generate_timeseries_from_metadata(
     
     for time_series_mask_pairs in metadata:
         for time_series, mask in time_series_mask_pairs:
-            print("MASK:\t", mask)
             time_stack = []
 
             for tileVH, tileVV in sorted(time_series):
@@ -217,7 +218,6 @@ def generate_timeseries_from_metadata(
             
             if len(time_stack) != 0:
                 x_stack = np.stack(time_stack, axis=0)
-                print(x_stack.shape)
                 with gdal_open(mask) as f:
                     mask_array = f.ReadAsArray()
             
