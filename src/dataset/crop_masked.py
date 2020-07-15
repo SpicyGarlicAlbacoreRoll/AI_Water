@@ -23,8 +23,8 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
-    # train_gen = ImageDataGenerator(rescale=10)
-    # test_gen = ImageDataGenerator(rescale=10)
+    train_gen = ImageDataGenerator(rescale=10)
+    test_gen = ImageDataGenerator(rescale=10)
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
     # Load the entire dataset into memory
@@ -45,9 +45,20 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # https://stackoverflow.com/questions/58948739/reshaping-images-for-input-into-keras-timedistributed-function
     # train_gen = TimeseriesGenerator()
     # test_gen = TimeseriesGenerator()
-    print(x_test[0].shape)
-    train_gen = TimeseriesGenerator(x_train, y_train, 1)
-    test_gen = TimeseriesGenerator(x_test, y_test, 1)
+    # print(x_test[0].shape)
+    # train_target_length = x_train.shape[0]
+    # test_target_length = x_test.shape[0]
+    x_train = np.array(x_train)[0]
+    x_test = np.array(x_test)[0]
+    y_train = np.expand_dims(np.array(y_train)[0], axis=0)
+    y_test = np.expand_dims(np.array(y_test)[0], axis=0)
+    y_train = np.stack((y_train, y_train), axis=0)
+    y_test = np.stack((y_test, y_test, y_test), axis = 0)
+    print("X shape:\t", x_train.shape)
+    print("Y shape:\t", y_train.shape)
+    train_gen = TimeseriesGenerator(x_train, batch_size=2, targets=y_train, length = 1)
+    print("train_gen successful!")
+    test_gen = TimeseriesGenerator(x_test, batch_size=2, targets=y_test, length = 1)
     # train_iter = train_gen.flow(
     #     x=x_train, y=y_train, batch_size=1
     # )
@@ -182,6 +193,7 @@ def generate_timeseries_from_metadata(
     mask_output_shape = (dems, dems, 1)
     
     for time_series_mask_pairs in metadata:
+        print(len(time_series_mask_pairs))
         for time_series, mask in time_series_mask_pairs:
             time_stack = []
 
@@ -202,11 +214,11 @@ def generate_timeseries_from_metadata(
                 except FileNotFoundError:
                     continue
 
-                tile_array = np.stack((tile_vh_array, tile_vv_array), axis = 2)
+                tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
 
-                if not edit:
-                    if not valid_image(tile_array):
-                        continue
+                # if not edit:
+                #     if not valid_image(tile_array):
+                #         continue
                 
                 x = np.array(tile_array).astype('float32')
 
@@ -217,9 +229,13 @@ def generate_timeseries_from_metadata(
                 time_stack.append(x)
             
             if len(time_stack) != 0:
-                x_stack = np.stack(time_stack, axis=0)
+                x_stack = np.stack(time_stack, 0)
+                # print(x_stack[0])
+                # x_stack = np.dstack(time_stack)
+                # print(x_stack.shape)
                 with gdal_open(mask) as f:
                     mask_array = f.ReadAsArray()
-            
+                
                 y = np.array(mask_array).astype('float32')
+                print(x_stack.shape, "\t", y.shape)
                 yield (x_stack, y.reshape(mask_output_shape))

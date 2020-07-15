@@ -53,16 +53,16 @@ def train_model(
         if verbose > 0:
             print(f"Epoch {epoch}/{epochs}")
 
-        history = model.fit_generator(
-            np.array(training_set),
-            steps_per_epoch=step_size_training,
-            epochs=1,
-            validation_data=np.array(test_set),
-            validation_steps=step_size_vaild,
-            verbose=verbose
-        )
+        # history = model.fit_generator(
+        #     training_set,
+        #     steps_per_epoch=step_size_training,
+        #     epochs=1,
+        #     validation_data=test_set,
+        #     validation_steps=step_size_vaild,
+        #     verbose=verbose
+        # )
 
-        # history = model.fit(training_set, test_set, 1, 1, verbose)
+        history = model.fit(training_set, y= None, batch_size=1, epochs=1, verbose=verbose)
 
         for key in model_history.keys():
             model_history[key] += history.history[key]
