@@ -48,25 +48,43 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # print(x_test[0].shape)
     # train_target_length = x_train.shape[0]
     # test_target_length = x_test.shape[0]
+
+    # x_train = np.stack(np.array(x_train))
+    # x_test = np.stack(np.array(x_test))
+    # y_train = np.stack(np.array(y_train))
+    # y_test = np.stack(np.array(y_test))
     x_train = np.array(x_train)[0]
     x_test = np.array(x_test)[0]
     y_train = np.expand_dims(np.array(y_train)[0], axis=0)
     y_test = np.expand_dims(np.array(y_test)[0], axis=0)
     y_train = np.stack((y_train, y_train), axis=0)
     y_test = np.stack((y_test, y_test, y_test), axis = 0)
+
     print("X shape:\t", x_train.shape)
     print("Y shape:\t", y_train.shape)
-    train_gen = TimeseriesGenerator(x_train, batch_size=2, targets=y_train, length = 1)
-    print("train_gen successful!")
-    test_gen = TimeseriesGenerator(x_test, batch_size=2, targets=y_test, length = 1)
-    # train_iter = train_gen.flow(
-    #     x=x_train, y=y_train, batch_size=1
-    # )
-    # test_iter = test_gen.flow(
-    #     x_test, y=y_test, batch_size=1, shuffle=False
-    # )
+    # for idx, t in enumerate(x_train):
+    #     print(t.shape)
+    #     train_gen = TimeseriesGenerator(t, batch_size=1, targets=np.stack((y_train, y_train)), length = 1)
 
-    return train_gen, test_gen
+    # train_gen = TimeseriesGenerator(x_train, batch_size=1, targets=y_train, length = 1)
+    # print("train_gen successful!")
+    # # for idx, t in enumerate(x_test):
+    # #     print(t.shape)
+    # #     test_gen = TimeseriesGenerator(t, batch_size=1, targets=np.stack((y_test, y_test, y_test)), length = 1)
+    # test_gen = TimeseriesGenerator(x_test, batch_size=1, targets=y_test, length = 2)
+    # print("test_gen successful!")
+
+    train_iter = train_gen.flow(
+        x=x_train, y=y_train, batch_size=1
+    )
+    print("train_gen successful!")
+    test_iter = test_gen.flow(
+        x=x_test, y=y_test, batch_size=1, shuffle = False
+    )
+    print("test_gen successful!")
+
+    return train_iter, test_iter
+    # return test_iter, train_iter
 
 
 def load_replace_data(
@@ -193,7 +211,6 @@ def generate_timeseries_from_metadata(
     mask_output_shape = (dems, dems, 1)
     
     for time_series_mask_pairs in metadata:
-        print(len(time_series_mask_pairs))
         for time_series, mask in time_series_mask_pairs:
             time_stack = []
 
@@ -229,13 +246,10 @@ def generate_timeseries_from_metadata(
                 time_stack.append(x)
             
             if len(time_stack) != 0:
-                x_stack = np.stack(time_stack, 0)
-                # print(x_stack[0])
-                # x_stack = np.dstack(time_stack)
-                # print(x_stack.shape)
+                x_stack = np.stack(time_stack, 0).astype('float32')
                 with gdal_open(mask) as f:
                     mask_array = f.ReadAsArray()
                 
                 y = np.array(mask_array).astype('float32')
-                print(x_stack.shape, "\t", y.shape)
+                # print(x_stack.shape, "\t", y.shape)
                 yield (x_stack, y.reshape(mask_output_shape))
