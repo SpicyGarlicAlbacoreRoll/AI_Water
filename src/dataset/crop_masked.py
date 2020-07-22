@@ -57,9 +57,9 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     x_test = np.array(x_test)[0]
     y_train = np.expand_dims(np.array(y_train)[0], axis=0)
     y_test = np.expand_dims(np.array(y_test)[0], axis=0)
-    y_train = np.stack((y_train, y_train), axis=0)
-    y_test = np.stack((y_test, y_test, y_test), axis = 0)
-
+    y_train = np.stack((y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train), axis=0)
+    y_test = np.stack((y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test), axis = 0)
+    
     print("X shape:\t", x_train.shape)
     print("Y shape:\t", y_train.shape)
     # for idx, t in enumerate(x_train):
@@ -161,7 +161,7 @@ def make_timeseries_metadata(
                             continue
 
                         # for testing purposes
-                        mask_name = f"{pre}_VH{end}.{ext}"
+                        mask_name = f"CDL_IA_2019_mask{end}.{ext}"
 
                         # Get VV VH Pair
                         for tileVV in VV_Tiles:
@@ -174,7 +174,13 @@ def make_timeseries_metadata(
                                         timeseries_path, file_dir, tileVV.replace("VV", "VH"))
                                     )
                                 )
-                            
+                        
+                        #get mask name for specific frame
+                        for mask in sorted(files):
+                            if re.search(fr"(.*)\_mask{end}\.(tif|tiff)", mask):
+                                mask_name = mask
+                                # print(mask_name)
+                                break
                         # The timestack with mask tuple(list(tuple(vv, vh)), mask)
                         data_frame = (
                                 tile_time_series_data, 
