@@ -29,7 +29,7 @@ lry = uly + (temp_ds.RasterYSize * yres)
 BBOX = str(ulx)+','+str(uly)+','+str(lrx)+','+str(lry)
 BBOX_padded = str(ulx+(15*xres))+','+str(lry+(15*yres))+','+str(lrx+(15*xres))+','+str(uly+(15*yres))
 
-URL = f"https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile?{year}=2019&bbox={BBOX_padded}"
+URL = f"https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile?year={year}&bbox={BBOX_padded}"
 
 print('\nGo to this website and copy the tif file url it gives you: ')
 print(URL)
