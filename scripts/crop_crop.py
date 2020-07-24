@@ -26,6 +26,12 @@ ulx, xres, xskew, uly, yskew, yres = ds.GetGeoTransform()
 lrx = ulx + (ds.RasterXSize * xres)
 lry = uly + (ds.RasterYSize * yres)
 
+# add a little extra so we make sure we get it all
+ulx = ulx - (xres*10)
+uly = uly - (yres*10)
+lrx = lrx + (xres*10)
+lry = lry + (yres*10)
+
 # project CDL file to match RTC file
 gdal.Warp(new_CDL_file, CDL_file, outputBounds=[ulx, uly, lrx, lry], xRes=30, yRes=30, dstSRS=epsg)
 print('\nBe sure to check the results in QGIS! :) \n')
