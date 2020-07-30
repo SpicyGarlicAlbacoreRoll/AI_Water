@@ -123,6 +123,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     #stride: the stride between samples (in this case, the amount of timesteps in a sample)
     #length: is the length of output sequences
     train_iter = TimeseriesGenerator(x_train, batch_size=1, stride=time_steps, targets=y_train, length = time_steps)
+    print(len(train_iter))
 
     # test_gen.fit(train_iter)
 
@@ -318,7 +319,7 @@ def generate_timeseries_from_metadata(
                 
                 y_stack = np.array(y_stack)
                 # y_stack = np.array(y_stack).reshape(512, 512, 1)
-                print(x_stack.shape, "\t", y.shape)
+                # print(x_stack.shape, "\t", y.shape)
                 # yield (x_stack, y_stack)
                 for zed in range(len(x_stack)):
                     yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
