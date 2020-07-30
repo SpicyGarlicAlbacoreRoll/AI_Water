@@ -35,7 +35,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     print("Batch Size:\t", batch_size)
     print("Time Steps:\t", time_steps)
     # x_train = np.empty((1862, 786432))
-    x_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 3))
+    x_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
     # x_train = np.empty((266, 9, 512, 512, 3))
     # y_train = []
     # y_train = np.empty((1862, 262144))
@@ -263,7 +263,7 @@ def generate_timeseries_from_metadata(
     timesteps=TIMESTEPS
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """ Yield training images and masks from the given metadata. """
-    output_shape = (timesteps, dems, dems, 3)
+    output_shape = (timesteps, dems, dems, 2)
     mask_output_shape = (dems, dems, 1)
     
     for time_series_mask_pairs in metadata:
@@ -287,9 +287,9 @@ def generate_timeseries_from_metadata(
                 except FileNotFoundError:
                     continue
 
-                blue_channel = np.multiply(np.add(tile_vh_array, tile_vv_array), 0.5)
+                # blue_channel = np.multiply(np.add(tile_vh_array, tile_vv_array), 0.5)
 
-                tile_array = np.stack((tile_vh_array, tile_vv_array, blue_channel), axis=2)
+                tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
 
 
                 # if not edit:

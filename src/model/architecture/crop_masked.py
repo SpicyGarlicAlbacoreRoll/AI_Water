@@ -60,7 +60,7 @@ def create_cdl_model_masked(
     """ Function to define the Time Distributed UNET Model """
 
     """Requires stack of Sequential SAR data (with vh vv channels stacked), where each image is a different timestep"""
-    inputs = Input(shape=(1, dems, dems, 3))
+    inputs = Input(shape=(1, dems, dems, 2))
     c1 = conv2d_block_time_dist(
         inputs, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
