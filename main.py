@@ -11,12 +11,14 @@ For more information see README.md
 import os
 from argparse import ArgumentParser, Namespace
 
-from src.asf_cnn import test_model_masked, train_model
+from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
 from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
-from src.plots import edit_predictions, plot_predictions
+from PIL import Image 
+# from src.plots import edit_predictions, plot_predictions
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
+from keras.preprocessing.image import array_to_img
 
 def train_wrapper(args: Namespace) -> None:
     """ Function for training a network. """
@@ -41,20 +43,26 @@ def test_wrapper(args: Namespace) -> None:
     model_name = args.model
     model = load_model(model_name)
 
-    if args.edit:
-        predictions, data_iter, metadata = test_model_masked(
-            model, args.dataset, args.edit
-        )
-        edit_predictions(
-            predictions, data_iter, metadata
-        )
-    else:
-        predictions, test_iter = test_model_masked(
-            model, args.dataset, args.edit
-        )
-        plot_predictions(
-            predictions, test_iter
-        )
+    # if args.edit:
+    #     predictions, data_iter, metadata = test_model_masked(
+    #         model, args.dataset, args.edit
+    #     )
+    #     edit_predictions(
+    #         predictions, data_iter, metadata
+    #     )
+    # else:
+    predictions, test_iter = test_model_timeseries(
+        model, args.dataset, args.edit
+    )
+
+    for idy, images in enumerate(predictions):
+        for idx, image in enumerate(images):
+            img = array_to_img(image)
+            filename = "predictions/file_{0}_{1}.tif".format(idx, idy)
+            img.save(filename)
+    # plot_predictions(
+    #     predictions, test_iter
+    # )
 
 
 if __name__ == '__main__':

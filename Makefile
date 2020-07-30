@@ -6,7 +6,6 @@ USER_DISPLAY := {$DISPLAY}
 
 image: build/AI_Water.Dockerfile
 	cd build && \
-	xhost + && \
 	docker build -f AI_Water.Dockerfile -t ai-water .
 
 container-mac: image
