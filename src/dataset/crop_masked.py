@@ -31,15 +31,16 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # x_train = []
     # x_train = np.array(x_train).reshape(1, 512, 512, 2)
     batch_size = len(train_metadata[0])
+    batch_size = 1
     time_steps = len(train_metadata[0][0][0])
     print("Batch Size:\t", batch_size)
     print("Time Steps:\t", time_steps)
     # x_train = np.empty((1862, 786432))
-    x_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    x_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
     # x_train = np.empty((266, 9, 512, 512, 3))
     # y_train = []
     # y_train = np.empty((1862, 262144))
-    y_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
+    y_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
     # y_train = np.empty((266, 9, 512, 512, 1))
     for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2))):
         # x_train.concat(time_stack)
@@ -122,7 +123,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
 
     #stride: the stride between samples (in this case, the amount of timesteps in a sample)
     #length: is the length of output sequences
-    train_iter = TimeseriesGenerator(x_train, batch_size=1, stride=time_steps, targets=y_train, length = time_steps)
+    train_iter = TimeseriesGenerator(x_train, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
     print(len(train_iter))
 
     # test_gen.fit(train_iter)
@@ -142,24 +143,31 @@ def load_replace_timeseries_data(
     dems=NETWORK_DEMS
 ) -> Tuple[Iterator, MaskedDatasetMetadata]:
 
-    replace_gen = ImageDataGenerator(rescale=10)
+    #replace_gen = ImageDataGenerator(rescale=10)
     metadata, _ = make_timeseries_metadata(dataset, edit=True)
 
     # Load the entire dataset into memory
-    x_replace = []
-    y_replace = []
-    for img, mask in generate_timeseries_from_metadata(
-        metadata,
-        edit=True,
-        clip_range=(0, 2),
-        dems=dems
-    ):
-        x_replace.append(img)
-        y_replace.append(mask)
+    batch_size = len(metadata[0])
+    time_steps = len(metadata[0][0][0])
+    print("Batch Size:\t", batch_size)
+    print("Time Steps:\t", time_steps)
+    # x_train = np.empty((1862, 786432))
+    x_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    # x_train = np.empty((266, 9, 512, 512, 3))
+    # y_train = []
+    # y_train = np.empty((1862, 262144))
+    y_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
+    # y_train = np.empty((266, 9, 512, 512, 1))
+    for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(metadata, clip_range=(0, 2))):
+        # x_train.concat(time_stack)
+        # y_train.concat(mask)
+        x_train[idx, :] = time_stack
+        y_train[idx, :] = mask
+    replace_iter = TimeseriesGenerator(x_train, batch_size=1, length = time_steps)
 
-    replace_iter = replace_gen.flow(
-        np.array(x_replace), y=np.array(y_replace), batch_size=1, shuffle=False
-    )
+    #replace_iter = replace_gen.flow(
+    #    np.array(x_replace), y=np.array(y_replace), batch_size=1, shuffle=False
+    #)
 
     return replace_iter, metadata
 
@@ -263,7 +271,7 @@ def generate_timeseries_from_metadata(
     timesteps=TIMESTEPS
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """ Yield training images and masks from the given metadata. """
-    output_shape = (timesteps, dems, dems, 2)
+    output_shape = (timesteps, dems, dems, 3)
     mask_output_shape = (dems, dems, 1)
     
     for time_series_mask_pairs in metadata:

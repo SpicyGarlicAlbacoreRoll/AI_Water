@@ -57,9 +57,10 @@ def test_wrapper(args: Namespace) -> None:
 
     for idy, images in enumerate(predictions):
         for idx, image in enumerate(images):
-            img = array_to_img(image)
-            filename = "predictions/file_{0}_{1}.tif".format(idx, idy)
-            img.save(filename)
+            if(idy == 0):
+                img = array_to_img(image)
+                filename = "predictions/file_{0}_{1}.tif".format(idx, idy)
+                img.save(filename)
     # plot_predictions(
     #     predictions, test_iter
     # )

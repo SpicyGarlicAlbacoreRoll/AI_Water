@@ -62,7 +62,7 @@ def train_model(
         #     verbose=verbose
         # )
 
-        history = model.fit(training_set, y= None, batch_size=1, steps_per_epoch=len(training_set), epochs=1, verbose=verbose)
+        history = model.fit_generator(training_set, epochs=1, verbose=verbose)
 
         # for key in model_history.keys():
         #     model_history[key] += history.history[key]
@@ -126,20 +126,20 @@ def test_model_timeseries(
     if edit:
         dataset_data = load_replace_timeseries_data(dataset, dems)
 
-        predictions = model.predict_generator(
-            dataset_data[0], len(dataset_data[0]), verbose=verbose
+        predictions = model.predict(
+            dataset_data, 1, verbose=verbose
         )
-        dataset_data[0].reset()
+        #dataset_data.reset()
         masked_predictions = predictions.round(decimals=0, out=None)
 
         return masked_predictions, dataset_data[0], dataset_data[1]
 
     else:
         _, test_iter = load_timeseries_dataset(dataset)
-        predictions = model.predict_generator(
-            test_iter, len(test_iter), verbose=verbose
+        predictions = model.predict(
+            test_iter, 1, verbose=verbose
         )
-        test_iter.reset()
+        #test_iter.reset()
         masked_predictions = predictions.round(decimals=0, out=None)
         
         return masked_predictions, test_iter
