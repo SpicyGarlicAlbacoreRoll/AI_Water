@@ -125,8 +125,8 @@ def load_history_from_path(model_dir: str) -> History:
 
 
 def model_type(model: Model, dem=NETWORK_DEMS) -> Optional[ModelType]:
-    if model.output_shape == (None, dem, dem, 1):
-        return ModelType.MASKED
-    # if model.output_shape == (None, 5, dem, dem, 3):
-    else:
-        return ModelType.CROP_CLASSIFIER
+    # if model.output_shape == (None, dem, dem, 1):
+    #     return ModelType.MASKED
+    # # if model.output_shape == (None, 5, dem, dem, 3):
+    # else:
+    return ModelType.CROP_CLASSIFIER

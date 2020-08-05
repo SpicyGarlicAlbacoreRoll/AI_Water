@@ -22,7 +22,7 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 # TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH\.(tiff|tif|TIFF|TIF)")
 
 
-def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
+def load_timeseries_dataset(dataset: str) -> Tuple[np.ndarray, np.ndarray]:
     train_gen = ImageDataGenerator(rescale=10)
     test_gen = ImageDataGenerator(rescale=10)
 
@@ -36,11 +36,11 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     print("Batch Size:\t", batch_size)
     print("Time Steps:\t", time_steps)
     # x_train = np.empty((1862, 786432))
-    x_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    x_train = np.empty((len(train_metadata[0]), time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
     # x_train = np.empty((266, 9, 512, 512, 3))
     # y_train = []
     # y_train = np.empty((1862, 262144))
-    y_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
+    y_train = np.empty((len(train_metadata[0]), 1, NETWORK_DEMS, NETWORK_DEMS, 1))
     # y_train = np.empty((266, 9, 512, 512, 1))
     for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2))):
         # x_train.concat(time_stack)
@@ -108,10 +108,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # test_gen = TimeseriesGenerator(x_test, batch_size=1, targets=y_test, length = 2)
     # print("test_gen successful!")
     # train_gen.fit(x_train)
-    zedX = np.array(x_train)[0]
-    zedY = np.array(y_train)[0]
-    print(zedX.shape)
-    print(zedY.shape)
+    # zedX = np.array(x_train)[0]
+    # zedY = np.array(y_train)[0]
+    # print(zedX.shape)
+    # print(zedY.shape)
     # zedY = np.expand_dims(np.array(y_train)[0], axis=0)
     
     
@@ -123,8 +123,8 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
 
     #stride: the stride between samples (in this case, the amount of timesteps in a sample)
     #length: is the length of output sequences
-    train_iter = TimeseriesGenerator(x_train, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
-    print(len(train_iter))
+    # train_iter = TimeseriesGenerator(x_train, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
+    # print(len(train_iter))
 
     # test_gen.fit(train_iter)
 
@@ -133,8 +133,9 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     #     x=x_test, y=y_test, batch_size=1, shuffle = False
     # )
     print("skipping test_gen...")
-
-    return train_iter, train_iter
+    print(x_train.shape)
+    print(y_train.shape)
+    return x_train, y_train
     # return test_iter, train_iter
 
 
@@ -319,16 +320,16 @@ def generate_timeseries_from_metadata(
                 
                 
 
-                y = np.array(mask_array).astype('float32')
+                y = np.array(mask_array).astype('float32').reshape(512, 512, 1)
 
                 y_stack = []
-                for zed in range(x_stack.shape[0]):
-                    y_stack.append(y.reshape(512, 512, 1))
+                # for zed in range(x_stack.shape[0]):
+                #     y_stack.append(y.reshape(512, 512, 1))
                 
                 y_stack = np.array(y_stack)
                 # y_stack = np.array(y_stack).reshape(512, 512, 1)
                 # print(x_stack.shape, "\t", y.shape)
-                # yield (x_stack, y_stack)
-                for zed in range(len(x_stack)):
-                    yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
+                yield (x_stack, y)
+                # for zed in range(len(x_stack)):
+                #     yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
                 # yield (x_stack, y_stack)
