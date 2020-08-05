@@ -6,6 +6,7 @@ written code.
 from typing import Tuple
 
 import numpy as np
+from math import floor
 from keras.models import Model
 from keras.preprocessing.image import Iterator
 
@@ -30,19 +31,19 @@ def train_model(
     if model_type(model) == ModelType.MASKED:
         training_set, test_set = load_dataset_masked(dataset)
     elif model_type(model) == ModelType.CROP_CLASSIFIER:
-        training_set, test_set = load_timeseries_dataset(dataset)
+        training_set_x, training_set_y = load_timeseries_dataset(dataset)
     else:
         print(
             "Unknown model output shape."
         )
         return
 
-    step_size_training = len(training_set)
+    # step_size_training = len(training_set)
     # step_size_vaild = len(test_set)
 
-    if not step_size_training:
-        print("No training data! Aborting...")
-        return
+    # if not step_size_training:
+    #     print("No training data! Aborting...")
+    #     return
 
     # Get the number of existing entries in the history
     epoch_prev = len(next(iter(model_history.values())))
@@ -61,8 +62,17 @@ def train_model(
         #     validation_steps=step_size_vaild,
         #     verbose=verbose
         # )
-
-        history = model.fit(training_set, validation_data=test_set, epochs=1, verbose=verbose)
+        
+        #set aside last ~25% of data for validation
+        # validation_split_index = floor(0.25 * len(training_set_x[0]))
+        # history = model.fit(training_set_x, validation_data=test_set, epochs=1, verbose=verbose)
+        history = model.fit(
+            x=training_set_x,
+            y=training_set_y,
+            validation_split=.25,
+            batch_size=1,
+            epochs=1,
+            verbose=verbose)
 
         for key in model_history.keys():
             model_history[key] += history.history[key]
@@ -108,6 +118,7 @@ def test_model_masked(
 
         return masked_predictions, test_iter
 
+
 def test_model_timeseries(
     model: Model,
     dataset: str,
@@ -129,7 +140,7 @@ def test_model_timeseries(
         predictions = model.predict(
             dataset_data, 1, verbose=verbose
         )
-        #dataset_data.reset()
+        # dataset_data.reset()
         masked_predictions = predictions.round(decimals=0, out=None)
 
         return masked_predictions, dataset_data[0], dataset_data[1]
@@ -139,7 +150,7 @@ def test_model_timeseries(
         predictions = model.predict(
             test_iter, 1, verbose=verbose
         )
-        #test_iter.reset()
+        # test_iter.reset()
         masked_predictions = predictions.round(decimals=0, out=None)
-        
+
         return masked_predictions, test_iter

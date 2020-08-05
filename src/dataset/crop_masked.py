@@ -22,7 +22,7 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 # TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH\.(tiff|tif|TIFF|TIF)")
 
 
-def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
+def load_timeseries_dataset(dataset: str) -> Tuple[np.ndarray, np.ndarray]:
     train_gen = ImageDataGenerator(rescale=10)
     test_gen = ImageDataGenerator(rescale=10)
 
@@ -30,113 +30,22 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # Load the entire dataset into memory
     # x_train = []
     # x_train = np.array(x_train).reshape(1, 512, 512, 2)
-    batch_size = len(train_metadata[0])
-    batch_size = 1
+    sample_size = len(train_metadata[0])
     time_steps = len(train_metadata[0][0][0])
-    print("Batch Size:\t", batch_size)
+    print("Sample Size:\t", sample_size)
     print("Time Steps:\t", time_steps)
-    # x_train = np.empty((1862, 786432))
-    x_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
-    # x_train = np.empty((266, 9, 512, 512, 3))
-    # y_train = []
-    # y_train = np.empty((1862, 262144))
-    y_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
-    # y_train = np.empty((266, 9, 512, 512, 1))
+
+    # pre-allocate for inserting by index
+    x_train = np.empty((sample_size, time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    y_train = np.empty((sample_size, 1, NETWORK_DEMS, NETWORK_DEMS, 1))
+
     for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2))):
-        # x_train.concat(time_stack)
-        # y_train.concat(mask)
         x_train[idx, :] = time_stack
         y_train[idx, :] = mask
 
-    # x_test = np.empty((2660, 512, 512, 3))
-    # # x_test = np.empty((266, 10, 512, 512, 3))
-    # # y_test = []
-    # y_test = np.empty((2660, 512, 512, 1))
-    # # y_test = np.empty((266, 10, 512, 512, 1))
-
-    # for time_stack, mask in generate_timeseries_from_metadata(test_metadata, clip_range=(0, 2)):
-    #     x_test[idx, :] = time_stack
-    #     y_test[idx, :] = mask
-
-
-    del train_metadata[:]
-    del train_metadata
-    del test_metadata[:]
-    del test_metadata
-
-    # Needed to work with Time Distributed Layers
-    # https://stackoverflow.com/questions/58948739/reshaping-images-for-input-into-keras-timedistributed-function
-    # train_gen = TimeseriesGenerator()
-    # test_gen = TimeseriesGenerator()
-    # print(x_test[0]8.shape)
-    # train_target_length = x_train.shape[0]
-    # test_target_length = x_test.shape[0]
-
-    # x_train = np.stack(np.array(x_train))
-    # x_test = np.stack(np.array(x_test))
-    # y_train = np.stack(np.array(y_train))
-    # y_test = np.stack(np.array(y_test))
-    print("Generation successful")
-    # x_train = np.array(x_train).reshape(4788, 512, 512, 2)
-    # x_test = np.array(x_test).reshape(4788, 512, 512, 2)
-    print("x_train shape:\t", x_train.shape)
-    # print("x_test shape:\t", x_test.shape)
-    # zed = input()
-    # y_train = np.array(y_train).reshape(4788, 512, 512, 2)
-    # y_test = np.array(y_test).reshape(4788, 512, 512, 2)
-    print("y_train:\t", y_train.shape)
-    # print("y_test:\t", y_test.shape)
-    # zed=input()
-    # x_train = np.array(x_train)[0]
-    # x_test = np.array(x_test)[0]
-    # y_train = np.expand_dims(np.array(y_train)[0], axis=0)
-    # y_test = np.expand_dims(np.array(y_test)[0], axis=0)
-    # y_train = np.stack((y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train, y_train), axis=0)
-    # y_test = np.stack((y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test, y_test), axis = 0)
-    
-    # print("X shape:\t", x_train.shape)
-    # print("Y shape:\t", y_train.shape)
-    # for idx, t in enumerate(x_train):
-    #     print(t.shape)
-    #     train_gen = TimeseriesGenerator(t, batch_size=1, targets=np.stack((y_train, y_train)), length = 1)
-
-    # train_gen = TimeseriesGenerator(x_train, batch_size=1, targets=y_train, length = 1)
-    # print("train_gen successful!")
-    # # for idx, t in enumerate(x_test):
-    # #     print(t.shape)
-    # #     test_gen = TimeseriesGenerator(t, batch_size=1, targets=np.stack((y_test, y_test, y_test)), length = 1)
-    # test_gen = TimeseriesGenerator(x_test, batch_size=1, targets=y_test, length = 2)
-    # print("test_gen successful!")
-    # train_gen.fit(x_train)
-    zedX = np.array(x_train)[0]
-    zedY = np.array(y_train)[0]
-    print(zedX.shape)
-    print(zedY.shape)
-    # zedY = np.expand_dims(np.array(y_train)[0], axis=0)
-    
-    
-    # train_iter = train_gen.flow(
-    #     x=zedX, y=zedY, batch_size=1
-    # )
-    
-    # train_iter = TimeseriesGenerator(x_train, batch_size=time_steps, targets=y_train, length = 1)
-
-    #stride: the stride between samples (in this case, the amount of timesteps in a sample)
-    #length: is the length of output sequences
-    train_iter = TimeseriesGenerator(x_train, end_index=1400, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
-    val_iter = TimeseriesGenerator(x_train, start_index=1401, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
-    print(len(train_iter))
-
-    # test_gen.fit(train_iter)
-
-    # print("train_gen successful!")
-    # test_iter = test_gen.flow(
-    #     x=x_test, y=y_test, batch_size=1, shuffle = False
-    # )
-    print("skipping test_gen...")
-
-    return train_iter, val_iter
-    # return test_iter, train_iter
+    print("\nX data shape:\t", x_train.shape)
+    print("Y data shape:\t", y_train.shape)
+    return x_train, y_train
 
 
 def load_replace_timeseries_data(
@@ -321,16 +230,16 @@ def generate_timeseries_from_metadata(
                 
                 
 
-                y = np.array(mask_array).astype('float32')
+                y = np.array(mask_array).astype('float32').reshape(512, 512, 1)
 
                 y_stack = []
-                for zed in range(x_stack.shape[0]):
-                    y_stack.append(y.reshape(512, 512, 1))
+                # for zed in range(x_stack.shape[0]):
+                #     y_stack.append(y.reshape(512, 512, 1))
                 
                 y_stack = np.array(y_stack)
                 # y_stack = np.array(y_stack).reshape(512, 512, 1)
                 # print(x_stack.shape, "\t", y.shape)
-                # yield (x_stack, y_stack)
-                for zed in range(len(x_stack)):
-                    yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
+                yield (x_stack, y)
+                # for zed in range(len(x_stack)):
+                #     yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
                 # yield (x_stack, y_stack)
