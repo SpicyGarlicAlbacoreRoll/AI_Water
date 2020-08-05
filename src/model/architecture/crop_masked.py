@@ -20,30 +20,30 @@ def conv2d_block_time_dist(
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
     # first layer
-    # x = TimeDistributed(
-    #     Conv2D(
-    #         filters=num_filters,
-    #         kernel_size=(kernel_size, kernel_size),
-    #         kernel_initializer='he_normal',
-    #         padding='same'
-    #     )
-    # )(input_tensor)
-    x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
+    x = TimeDistributed(
+        Conv2D(
+            filters=num_filters,
+            kernel_size=(kernel_size, kernel_size),
+            kernel_initializer='he_normal',
+            padding='same'
+        )
+    )(input_tensor)
+    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
 
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
     # second layer
-    # x = TimeDistributed(
-    #     Conv2D(
-    #         filters=num_filters,
-    #         kernel_size=(kernel_size, kernel_size),
-    #         kernel_initializer='he_normal',
-    #         padding='same'
-    #     )
-    # )(input_tensor)
+    x = TimeDistributed(
+        Conv2D(
+            filters=num_filters,
+            kernel_size=(kernel_size, kernel_size),
+            kernel_initializer='he_normal',
+            padding='same'
+        )
+    )(input_tensor)
 
-    x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
+    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
