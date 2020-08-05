@@ -55,12 +55,29 @@ def test_wrapper(args: Namespace) -> None:
         model, args.dataset, args.edit
     )
 
+    # for batch in test_iter[0][0]:
+    #     print(len(batch))
+    #     for idy, x_y_pair in enumerate(batch[0]):
+    #         for idx, (x, y) in enumerate(x_y_pair):
+    #             print("x:\t", len(x), "\ny:", len(y))
+    #             if(idy % 2 == 0):
+    #                 img_mask = array_to_img(y)
+    #                 mask = "predictions/mask_{0}_{1}.tif".format(idx, idy)
+    #                 img_mask.save(mask)
+
+    #                 input_image = array_to_img(x)
+    #                 input_image_name = "predictions/input_{0}_{1}.tif".format(idx, idy)
+    #                 img_mask.save(input_image)
+
+    print(len(predictions))
     for idy, images in enumerate(predictions):
+        print(len(images))
         for idx, image in enumerate(images):
-            if(idy == 0):
+            if(idy % 2 == 0):
                 img = array_to_img(image)
-                filename = "predictions/file_{0}_{1}.tif".format(idx, idy)
+                filename = "predictions/prediction_{0}_{1}.tif".format(idx, idy)
                 img.save(filename)
+                
     # plot_predictions(
     #     predictions, test_iter
     # )

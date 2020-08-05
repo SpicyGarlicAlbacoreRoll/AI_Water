@@ -123,7 +123,8 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
 
     #stride: the stride between samples (in this case, the amount of timesteps in a sample)
     #length: is the length of output sequences
-    train_iter = TimeseriesGenerator(x_train, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
+    train_iter = TimeseriesGenerator(x_train, end_index=1400, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
+    val_iter = TimeseriesGenerator(x_train, start_index=1401, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
     print(len(train_iter))
 
     # test_gen.fit(train_iter)
@@ -134,7 +135,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
     # )
     print("skipping test_gen...")
 
-    return train_iter, train_iter
+    return train_iter, val_iter
     # return test_iter, train_iter
 
 
@@ -147,24 +148,25 @@ def load_replace_timeseries_data(
     metadata, _ = make_timeseries_metadata(dataset, edit=True)
 
     # Load the entire dataset into memory
-    batch_size = len(metadata[0])
+    # batch_size = len(metadata[0])
+    batch_size = 1
     time_steps = len(metadata[0][0][0])
     print("Batch Size:\t", batch_size)
     print("Time Steps:\t", time_steps)
     # x_train = np.empty((1862, 786432))
-    x_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    x_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
     # x_train = np.empty((266, 9, 512, 512, 3))
     # y_train = []
     # y_train = np.empty((1862, 262144))
-    y_train = np.empty((batch_size * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
+    y_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
     # y_train = np.empty((266, 9, 512, 512, 1))
     for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(metadata, clip_range=(0, 2))):
         # x_train.concat(time_stack)
         # y_train.concat(mask)
         x_train[idx, :] = time_stack
         y_train[idx, :] = mask
-    replace_iter = TimeseriesGenerator(x_train, batch_size=1, length = time_steps)
-
+    # replace_iter = TimeseriesGenerator(x_train, batch_size=1, length = time_steps)
+    replace_iter = TimeseriesGenerator(x_train, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length = time_steps)
     #replace_iter = replace_gen.flow(
     #    np.array(x_replace), y=np.array(y_replace), batch_size=1, shuffle=False
     #)

@@ -62,10 +62,10 @@ def train_model(
         #     verbose=verbose
         # )
 
-        history = model.fit_generator(training_set, epochs=1, verbose=verbose)
+        history = model.fit(training_set, validation_data=test_set, epochs=1, verbose=verbose)
 
-        # for key in model_history.keys():
-        #     model_history[key] += history.history[key]
+        for key in model_history.keys():
+            model_history[key] += history.history[key]
 
         save_model(model, f"e{epoch + epoch_prev}", history=model_history)
 
