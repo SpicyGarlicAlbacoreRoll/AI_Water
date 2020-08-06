@@ -1,7 +1,7 @@
 """
     Contains the architecture for creating a cropland data layer within SAR images.
 """
-
+from tensorflow.python.framework.ops import disable_eager_execution
 from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.merge import concatenate
@@ -64,12 +64,11 @@ def create_cdl_model_masked(
     """ Function to define the Time Distributed UNET Model """
 
     """Requires stack of Sequential SAR data (with vh vv channels stacked), where each image is a different timestep"""
-    inputs = Input(shape=(2, dems, dems, 2))
+    inputs = Input(shape=(12, dems, dems, 2))
     c1 = conv2d_block_time_dist(
         inputs, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
 
-    print(c1.shape)
     p1 = TimeDistributed(MaxPooling2D((2, 2)))(c1)
     p1 = TimeDistributed(Dropout(dropout))(p1)
 
@@ -83,7 +82,7 @@ def create_cdl_model_masked(
 
     c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
-    p4 = Dropout(dropout)(p4)
+    p4 = TimeDistributed(Dropout(dropout))(p4)
 
     c5 = conv2d_block_time_dist(p4, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p5 = TimeDistributed(MaxPooling2D((2, 2)))(c5)
@@ -152,10 +151,12 @@ def create_cdl_model_masked(
         u13, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
 
+    # outputs = TimeDistributed(Conv2D(1, (1, 1), activation='sigmoid', name='last_layer'))(c13)
     outputs = ConvLSTM2D(1, (1, 1), activation='sigmoid', name='last_layer')(c13)
     # outputs = TimeDistributed(Flatten())(outputs)
     # lstm = LSTM(2)(outputs)
     # final = Dense(1, activation='sigmoid')(lstm)
+
     model = Model(inputs=inputs, outputs=[outputs])
 
     model.__asf_model_name = model_name

@@ -6,8 +6,8 @@ written code.
 from typing import Tuple
 
 import numpy as np
-from math import floor
 from keras.models import Model
+from keras.backend import clear_session
 from keras.preprocessing.image import Iterator
 
 from .dataset.masked import load_dataset as load_dataset_masked
@@ -64,20 +64,24 @@ def train_model(
         # )
         
         #set aside last ~25% of data for validation
-        # validation_split_index = floor(0.25 * len(training_set_x[0]))
+        # reduced_size = floor(0.25 * len(training_set_x[0]))
         # history = model.fit(training_set_x, validation_data=test_set, epochs=1, verbose=verbose)
+        
+        clear_session()
+        
         history = model.fit(
             x=training_set_x,
             y=training_set_y,
-            validation_split=.25,
             batch_size=1,
             epochs=1,
             verbose=verbose)
 
-        for key in model_history.keys():
-            model_history[key] += history.history[key]
+        # for key in model_history.keys():
+        #     model_history[key] += history.history[key]
 
         save_model(model, f"e{epoch + epoch_prev}", history=model_history)
+        if(epoch != epochs):
+            del history
 
     save_model(model, 'latest')
 

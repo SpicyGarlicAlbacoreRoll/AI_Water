@@ -78,7 +78,7 @@ def save_model(
     if history:
         save_history_to_path(history, model_dir)
 
-    model.save(model_path)
+    model.save(model_path, include_optimizer=False)
 
 
 def load_model(model_name: str) -> Model:

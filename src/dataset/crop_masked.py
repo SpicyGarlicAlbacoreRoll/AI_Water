@@ -4,6 +4,8 @@ the prepared data set for use.
 """
 
 import os
+import tensorflow as tf
+from math import floor
 import re
 from typing import Generator, Optional, Tuple
 
@@ -27,9 +29,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[np.ndarray, np.ndarray]:
     test_gen = ImageDataGenerator(rescale=10)
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
-    # Load the entire dataset into memory
-    # x_train = []
-    # x_train = np.array(x_train).reshape(1, 512, 512, 2)
+
     sample_size = len(train_metadata[0])
     time_steps = len(train_metadata[0][0][0])
     print("Sample Size:\t", sample_size)
@@ -43,9 +43,11 @@ def load_timeseries_dataset(dataset: str) -> Tuple[np.ndarray, np.ndarray]:
         x_train[idx, :] = time_stack
         y_train[idx, :] = mask
 
+
+    # reduced_size = floor(0.5 * x_train.shape[0])
     print("\nX data shape:\t", x_train.shape)
     print("Y data shape:\t", y_train.shape)
-    return x_train, y_train
+    return tf.convert_to_tensor(x_train), tf.convert_to_tensor(y_train)
 
 
 def load_replace_timeseries_data(
@@ -165,10 +167,8 @@ def make_timeseries_metadata(
                             train_metadata.append(data)
                     else:
                         if data_dir == 'train':
-                            print("training:\t", data[0])
                             train_metadata.append(data)
                         elif data_dir == 'test':
-                            print("testing:\t", data[0])
                             test_metadata.append(data)
 
     return train_metadata, test_metadata
