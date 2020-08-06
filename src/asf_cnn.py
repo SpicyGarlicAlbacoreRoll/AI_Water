@@ -31,7 +31,7 @@ def train_model(
     if model_type(model) == ModelType.MASKED:
         training_set, test_set = load_dataset_masked(dataset)
     elif model_type(model) == ModelType.CROP_CLASSIFIER:
-        training_set_x, training_set_y = load_timeseries_dataset(dataset)
+        training_set, validation_set = load_timeseries_dataset(dataset)
     else:
         print(
             "Unknown model output shape."
@@ -67,10 +67,8 @@ def train_model(
         # validation_split_index = floor(0.25 * len(training_set_x[0]))
         # history = model.fit(training_set_x, validation_data=test_set, epochs=1, verbose=verbose)
         history = model.fit(
-            x=training_set_x,
-            y=training_set_y,
-            validation_split=.25,
-            batch_size=1,
+            training_set, 
+            validation_data=validation_set,
             epochs=1,
             verbose=verbose)
 
