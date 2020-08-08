@@ -11,7 +11,7 @@ from keras.backend import clear_session
 from keras.preprocessing.image import Iterator
 
 from .dataset.masked import load_dataset as load_dataset_masked
-from .dataset.crop_masked import load_timeseries_dataset, load_replace_timeseries_data
+from .dataset.crop_masked import load_timeseries_dataset, load_replace_timeseries_data, load_test_timeseries_dataset
 from .dataset.masked import load_replace_data
 from .model import ModelType, model_type, save_model
 from .asf_typing import History
@@ -141,7 +141,7 @@ def test_model_timeseries(
         dataset_data = load_replace_timeseries_data(dataset, dems)
 
         predictions = model.predict(
-            dataset_data, 1, verbose=verbose
+            dataset_data, verbose=verbose
         )
         # dataset_data.reset()
         masked_predictions = predictions.round(decimals=0, out=None)
@@ -149,11 +149,11 @@ def test_model_timeseries(
         return masked_predictions, dataset_data[0], dataset_data[1]
 
     else:
-        _, test_iter = load_timeseries_dataset(dataset)
+        test_metadata, test_iter = load_test_timeseries_dataset(dataset)
         predictions = model.predict(
-            test_iter, 1, verbose=verbose
+            test_iter, verbose=verbose
         )
         # test_iter.reset()
         masked_predictions = predictions.round(decimals=0, out=None)
 
-        return masked_predictions, test_iter
+        return masked_predictions, test_metadata

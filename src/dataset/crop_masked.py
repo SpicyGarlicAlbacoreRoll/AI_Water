@@ -27,8 +27,6 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
-    train_gen = ImageDataGenerator(rescale=10)
-    test_gen = ImageDataGenerator(rescale=10)
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
@@ -70,6 +68,27 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         n_classes=2,
         shuffle=False)
     return train_iter, validation_iter
+
+def load_test_timeseries_dataset(dataset: str):
+    train_metadata, test_metadata = make_timeseries_metadata(dataset)
+
+    sample_size = len(train_metadata[0])
+    time_steps = len(train_metadata[0][0][0])
+    print("Sample Size:\t", sample_size)
+    print("Time Steps:\t", time_steps)
+    
+    test_iter = SARTimeseriesGenerator(
+        test_metadata[0],
+        batch_size=1,
+        dim=(NETWORK_DEMS, NETWORK_DEMS),
+        time_steps=time_steps,
+        n_channels=2,
+        output_dim=(NETWORK_DEMS, NETWORK_DEMS),
+        output_channels=1,
+        n_classes=2,
+        shuffle=False)
+    
+    return test_metadata, test_iter
 
 
 def load_replace_timeseries_data(
