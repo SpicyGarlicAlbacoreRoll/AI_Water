@@ -45,8 +45,8 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __data_generation(self, list_IDs_temp):
         # (samples, timesteps, width, height, channels)
-        X = np.empty((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.empty((self.batch_size, 1, *self.output_dim, self.output_channels), dtype=np.float32)
+        X = np.zeros((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
+        y = np.zeros((self.batch_size, 1, *self.output_dim, self.output_channels), dtype=np.float32)
 
         for sample_idx, (time_series, mask) in enumerate(list_IDs_temp):
             time_series_stack = []
@@ -73,6 +73,22 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 time_series_stack.append(tile_array)
             
             if len(time_series_stack) != 0:
+
+                # if we end up with a stack with less than the set amount of timesteps, 
+                # append existing elements until we get enough timesteps
+
+                # We have three options to work around this problem of variable timesteps we either
+                    # Removing rows with missing values.
+                    # Mark and learn missing values.
+                    # Mask and learn without missing values.
+
+                if len(time_series_stack) < self.time_steps:
+                    idx = len(time_series_stack)
+                    temp = time_series_stack[0]
+                    while(idx != self.time_steps):
+                        time_series_stack.append(temp)
+                        idx+=1
+
                 #convert list of vv vh composites to numpy array
                 x_stack = np.stack(time_series_stack, axis=0).astype('float32')
 

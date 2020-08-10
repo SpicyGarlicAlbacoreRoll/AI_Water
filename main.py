@@ -51,32 +51,36 @@ def test_wrapper(args: Namespace) -> None:
     #         predictions, data_iter, metadata
     #     )
     # else:
-    predictions, test_iter = test_model_timeseries(
+    predictions, test_metadata = test_model_timeseries(
         model, args.dataset, args.edit
     )
 
-    # for batch in test_iter[0][0]:
-    #     print(len(batch))
-    #     for idy, x_y_pair in enumerate(batch[0]):
+    # for sample in test_metadata[0]:
+    #     print(len(sample))
+    #     for idy, x_y_pair in enumerate(sample):
     #         for idx, (x, y) in enumerate(x_y_pair):
-    #             print("x:\t", len(x), "\ny:", len(y))
+    #             print("x:\t", len(x), "\ny:\t", len(y))
     #             if(idy % 2 == 0):
-    #                 img_mask = array_to_img(y)
-    #                 mask = "predictions/mask_{0}_{1}.tif".format(idx, idy)
-    #                 img_mask.save(mask)
+    #                 imgY = Image.open(y)
+    #                 imgY.save("predictions/" + "MASK_" + str(idx) + ".tif")
+    #                 imgX = Image.open(x)
+    #                 imgX.save("predictions/" + "VV_" + str(idx) + ".tif")
+    #                 # img_mask = array_to_img(y)
+    #                 # mask = "predictions/mask_{0}_{1}.tif".format(idx, idy)
+    #                 # img_mask.save(mask)
 
-    #                 input_image = array_to_img(x)
-    #                 input_image_name = "predictions/input_{0}_{1}.tif".format(idx, idy)
-    #                 img_mask.save(input_image)
+    #                 # input_image = array_to_img(x)
+    #                 # input_image_name = "predictions/input_{0}_{1}.tif".format(idx, idy)
+    #                 # img_mask.save(input_image)
 
     print(len(predictions))
-    for idy, images in enumerate(predictions):
-        print(len(images))
-        for idx, image in enumerate(images):
-            if(idy % 2 == 0):
-                img = array_to_img(image)
-                filename = "predictions/prediction_{0}_{1}.tif".format(idx, idy)
-                img.save(filename)
+    for idy, image in enumerate(predictions):
+        # print(len(images))
+        # for idx, image in enumerate(images):
+        if(idy % 2 == 0):
+            img = array_to_img(image)
+            filename = "predictions/prediction_{0}.tif".format(idy)
+            img.save(filename)
                 
     # plot_predictions(
     #     predictions, test_iter

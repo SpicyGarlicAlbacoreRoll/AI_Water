@@ -27,8 +27,6 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
-    train_gen = ImageDataGenerator(rescale=10)
-    test_gen = ImageDataGenerator(rescale=10)
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
@@ -70,6 +68,27 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         n_classes=2,
         shuffle=True)
     return train_iter, validation_iter
+
+def load_test_timeseries_dataset(dataset: str):
+    train_metadata, test_metadata = make_timeseries_metadata(dataset)
+
+    sample_size = len(train_metadata[0])
+    time_steps = len(train_metadata[0][0][0])
+    print("Sample Size:\t", sample_size)
+    print("Time Steps:\t", time_steps)
+    
+    test_iter = SARTimeseriesGenerator(
+        test_metadata[0],
+        batch_size=1,
+        dim=(NETWORK_DEMS, NETWORK_DEMS),
+        time_steps=time_steps,
+        n_channels=2,
+        output_dim=(NETWORK_DEMS, NETWORK_DEMS),
+        output_channels=1,
+        n_classes=2,
+        shuffle=False)
+    
+    return test_metadata, test_iter
 
 
 def load_replace_timeseries_data(
@@ -132,7 +151,6 @@ def make_timeseries_metadata(
 
                     # keep track of frames that have already been stacked
                     frames = []
-
                     for tile_name in files:
                         m = re.match(TITLE_TIME_SERIES_REGEX, tile_name)
                         if not m:
@@ -148,7 +166,7 @@ def make_timeseries_metadata(
                         if frame_index not in frames:
                             VV_Tiles = [
                                 tileVV for tileVV in sorted(files)
-                                if re.match(fr"(.*)\_VV{end}\.(tif|tiff)", tileVV)
+                                if re.match(fr"(.*)\_VV{end}\.(tif|tiff)", tileVV) and validate_image(timeseries_path, file_dir, tileVV)
                             ]
                             frames.append(end)
                         else:
@@ -157,17 +175,19 @@ def make_timeseries_metadata(
                         # for testing purposes
                         mask_name = f"CDL_IA_2019_mask{end}.{ext}"
 
+                        
                         # Get VV VH Pair
-                        for tileVV in VV_Tiles:
-                            tile_time_series_data.append(
-                                (
-                                    os.path.join(
-                                        timeseries_path, file_dir, tileVV
-                                    ),
-                                    os.path.join(
-                                        timeseries_path, file_dir, tileVV.replace("VV", "VH"))
+                        if(len(VV_Tiles) > 0):
+                            for tileVV in VV_Tiles:
+                                tile_time_series_data.append(
+                                    (
+                                        os.path.join(
+                                            timeseries_path, file_dir, tileVV
+                                        ),
+                                        os.path.join(
+                                            timeseries_path, file_dir, tileVV.replace("VV", "VH"))
+                                    )
                                 )
-                            )
 
                         # get mask name for specific frame
                         for mask in sorted(files):
@@ -182,16 +202,19 @@ def make_timeseries_metadata(
                                 timeseries_path, file_dir, mask_name
                             )
                         )
+                        print("LENGTH OF DATA:\t", len(data_frame[0]))
+                        # print("LENGTH OF DATA:\t", len(data[0][0]), "\n")
+                        if len(data_frame[0]) != 0:
+                            data.append(data_frame)
 
-                        data.append(data_frame)
 
                     if edit:
-                        if data_dir == 'test' or data_dir == 'train':
+                        if data_dir == 'test' or data_dir == 'train' and len(data[0]) !=0:
                             train_metadata.append(data)
                     else:
-                        if data_dir == 'train':
+                        if data_dir == 'train' and len(data[0]) !=0:
                             train_metadata.append(data)
-                        elif data_dir == 'test':
+                        elif data_dir == 'test' and len(data[0]) !=0:
                             test_metadata.append(data)
 
     return train_metadata, test_metadata
@@ -263,3 +286,21 @@ def generate_timeseries_from_metadata(
                 # for zed in range(len(x_stack)):
                 #     yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
                 # yield (x_stack, y_stack)
+
+def validate_image(path: str, dir: str, image: str) -> bool:
+    try:
+        with gdal_open(os.path.join(path, dir, image)) as f:
+            tile_vv_array = f.ReadAsArray()
+    except FileNotFoundError:
+        return False
+    try:
+        with gdal_open(os.path.join(path, dir, image.replace('VV', 'VH'))):
+            tile_vh_array = f.ReadAsArray()
+    except FileNotFoundError:
+        return False
+    # if not edit:
+    tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
+    if not valid_image(tile_array):
+        return False
+    
+    return True
