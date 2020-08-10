@@ -30,6 +30,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
+    print("train metadata length:\t", len(train_metadata))
     flattened_list = []
 
     for subset in train_metadata:
@@ -150,6 +151,7 @@ def make_timeseries_metadata(
             for file_dir in timeseries_dirs:
                 for data_point_path, _, files in os.walk(os.path.join(timeseries_path, file_dir)):
                     # print(files)
+                    print(len(files))
                     print(data_point_path)
 
                     # our list of time series frames + masks that will be appended to test and train metadata
@@ -215,13 +217,16 @@ def make_timeseries_metadata(
 
 
                     if edit:
-                        if data_dir == 'test' or data_dir == 'train' and len(data[0]) !=0:
-                            train_metadata.append(data)
+                        if data_dir == 'test' or data_dir == 'train' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                train_metadata.append(data)
                     else:
-                        if data_dir == 'train' and len(data[0]) !=0:
-                            train_metadata.append(data)
-                        elif data_dir == 'test' and len(data[0]) !=0:
-                            test_metadata.append(data)
+                        if data_dir == 'train' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                train_metadata.append(data)
+                        elif data_dir == 'test' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                test_metadata.append(data)
 
     return train_metadata, test_metadata
 
@@ -307,6 +312,15 @@ def validate_image(path: str, dir: str, image: str) -> bool:
     # if not edit:
     tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
     if not valid_image(tile_array):
+        return False
+    
+    return True
+
+def validate_mask(mask: str) -> bool:
+    try:
+        with gdal_open(mask) as f:
+            tile_vv_array = f.ReadAsArray()
+    except FileNotFoundError:
         return False
     
     return True
