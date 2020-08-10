@@ -30,8 +30,14 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
-    sample_size = len(train_metadata[0])
-    time_steps = len(train_metadata[0][0][0])
+    flattened_list = []
+
+    for subset in train_metadata:
+        for time_series_mask_pair in subset:
+            flattened_list.append(time_series_mask_pair)
+
+    sample_size = len(flattened_list)
+    time_steps = len(flattened_list[0][0])
     print("Sample Size:\t", sample_size)
     print("Time Steps:\t", time_steps)
 
@@ -48,7 +54,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     validation_split = .25
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
-        train_metadata[0][:-split_index],
+        flattened_list[:-split_index],
         batch_size=4,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
@@ -58,7 +64,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         n_classes=2,
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
-        train_metadata[0][-split_index:],
+        flattened_list[-split_index:],
         batch_size=3,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
@@ -202,7 +208,7 @@ def make_timeseries_metadata(
                                 timeseries_path, file_dir, mask_name
                             )
                         )
-                        print("LENGTH OF DATA:\t", len(data_frame[0]))
+                        # print("LENGTH OF DATA:\t", len(data_frame[0]))
                         # print("LENGTH OF DATA:\t", len(data[0][0]), "\n")
                         if len(data_frame[0]) != 0:
                             data.append(data_frame)
