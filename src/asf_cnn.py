@@ -75,8 +75,8 @@ def train_model(
             epochs=1,
             verbose=verbose)
 
-        # for key in model_history.keys():
-        #     model_history[key] += history.history[key]
+        for key in model_history.keys():
+            model_history[key] += history.history[key]
 
         save_model(model, f"e{epoch + epoch_prev}", history=model_history)
         if(epoch != epochs):

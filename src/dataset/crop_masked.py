@@ -51,24 +51,24 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
         train_metadata[0][:-split_index],
-        batch_size=1,
+        batch_size=4,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
         n_classes=2,
-        shuffle=False)
+        shuffle=True)
     validation_iter = SARTimeseriesGenerator(
         train_metadata[0][-split_index:],
-        batch_size=1,
+        batch_size=3,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
         n_classes=2,
-        shuffle=False)
+        shuffle=True)
     return train_iter, validation_iter
 
 
