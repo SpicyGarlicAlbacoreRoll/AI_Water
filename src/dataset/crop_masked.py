@@ -30,7 +30,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
-    print("train metadata length:\t", len(train_metadata))
+    print("\n# of datasets:\t", len(train_metadata))
     flattened_list = []
 
     for subset in train_metadata:
@@ -38,9 +38,11 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
             flattened_list.append(time_series_mask_pair)
 
     sample_size = len(flattened_list)
-    time_steps = len(flattened_list[0][0])
-    print("Sample Size:\t", sample_size)
-    print("Time Steps:\t", time_steps)
+    time_steps = max(len(x[0]) for x in flattened_list)
+    # time_steps = len(flattened_list[0][0])
+    print("\tCombined Sample Size:\t", sample_size)
+    print("\tMax Time Steps:\t", time_steps)
+    print("\n")
 
     # pre-allocate for inserting by index
     # x_train = np.empty((sample_size, time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
@@ -56,7 +58,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
         flattened_list[:-split_index],
-        batch_size=4,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -66,7 +68,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
         flattened_list[-split_index:],
-        batch_size=3,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -151,9 +153,9 @@ def make_timeseries_metadata(
             for file_dir in timeseries_dirs:
                 for data_point_path, _, files in os.walk(os.path.join(timeseries_path, file_dir)):
                     # print(files)
-                    print(len(files))
-                    print(data_point_path)
-
+                    
+                    print("\ndataset folder path:\t", data_point_path)
+                    print("\t# of files:\t\t", len(files))
                     # our list of time series frames + masks that will be appended to test and train metadata
                     data = []
 
@@ -215,6 +217,7 @@ def make_timeseries_metadata(
                         if len(data_frame[0]) != 0:
                             data.append(data_frame)
 
+                    print("\t# of valid frames:\t", len(data))
 
                     if edit:
                         if data_dir == 'test' or data_dir == 'train' and len(data) != 0:
