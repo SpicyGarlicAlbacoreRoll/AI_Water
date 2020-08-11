@@ -20,6 +20,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         self.n_classes = n_classes
         self.shuffle = shuffle
         self.clip_range = clip_range
+        self.metadata = []
         self.on_epoch_end()
 
     def __len__(self):
@@ -44,6 +45,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
 
     def __data_generation(self, list_IDs_temp):
+        setBatchMetadata(list_IDs_temp)
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
         y = np.zeros((self.batch_size, 1, *self.output_dim, self.output_channels), dtype=np.float32)
@@ -101,3 +103,15 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 y[sample_idx,] = mask_array
         
         return X, y
+
+
+    # Non-keras.utils.Sequence functions
+
+    # accessor to get metadata, ordered by input, contains strings of file paths and their 
+    # crop mask in the order they're fed to the model
+    def getBatchMetadata() -> List[Tuple[List[Tuple[str, str]], str]]:
+        return self.metadata
+
+    # when each batch begins we record what files are passed to the model
+    def setBatchMetadata(batch: Tuple[List[Tuple[str, str]], str]):
+        self.metadata.append(batch)

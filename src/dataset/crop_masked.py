@@ -63,7 +63,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
         flattened_list[:-split_index],
-        batch_size=1,
+        batch_size=4,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -73,7 +73,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
         flattened_list[-split_index:],
-        batch_size=1,
+        batch_size=4,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -83,17 +83,27 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         shuffle=True)
     return train_iter, validation_iter
 
-def load_test_timeseries_dataset(dataset: str):
+def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata, Iterator]:
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
-    sample_size = len(train_metadata[0])
-    time_steps = len(train_metadata[0][0][0])
-    print("Sample Size:\t", sample_size)
-    print("Time Steps:\t", time_steps)
+
+    print("\n# of datasets:\t", len(test_metadata))
+    flattened_list = []
+
+    for subset in test_metadata:
+        for time_series_mask_pair in subset:
+            flattened_list.append(time_series_mask_pair)
+
+    sample_size = len(flattened_list)
+    time_steps = max(len(x[0]) for x in flattened_list)
+    # time_steps = len(flattened_list[0][0])
+    print("\tCombined Sample Size:\t", sample_size)
+    print("\tMax Time Steps:\t", time_steps)
+    print("\n")
     
     test_iter = SARTimeseriesGenerator(
-        test_metadata[0],
-        batch_size=1,
+        flattened_list,
+        batch_size=4,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,

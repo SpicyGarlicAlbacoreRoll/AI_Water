@@ -9,6 +9,8 @@ For more information see README.md
 """
 
 import os
+import json
+from datetime import date, datetime 
 from argparse import ArgumentParser, Namespace
 
 from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
@@ -51,36 +53,57 @@ def test_wrapper(args: Namespace) -> None:
     #         predictions, data_iter, metadata
     #     )
     # else:
-    predictions, test_metadata = test_model_timeseries(
+    predictions, test_batch_metadata = test_model_timeseries(
         model, args.dataset, args.edit
     )
 
-    # for sample in test_metadata[0]:
-    #     print(len(sample))
-    #     for idy, x_y_pair in enumerate(sample):
-    #         for idx, (x, y) in enumerate(x_y_pair):
-    #             print("x:\t", len(x), "\ny:\t", len(y))
-    #             if(idy % 2 == 0):
-    #                 imgY = Image.open(y)
-    #                 imgY.save("predictions/" + "MASK_" + str(idx) + ".tif")
-    #                 imgX = Image.open(x)
-    #                 imgX.save("predictions/" + "VV_" + str(idx) + ".tif")
-    #                 # img_mask = array_to_img(y)
-    #                 # mask = "predictions/mask_{0}_{1}.tif".format(idx, idy)
-    #                 # img_mask.save(mask)
+    model_batch_size = len(test_batch_metadata[0])
+    current_date_time = str(datetime.utcnow())
 
-    #                 # input_image = array_to_img(x)
-    #                 # input_image_name = "predictions/input_{0}_{1}.tif".format(idx, idy)
-    #                 # img_mask.save(input_image)
+    # Version number _ Country _ Region
+    model_name_metadata = model_name.split("_")
+    
+    metadata = {"model_test_info": {"name": model_name, "model_architecture_version": model_name_metadata[0], "dataset": args.dataset, "batch_size": model_batch_size, "UTC_date_time": current_date_time}}
 
-    print(len(predictions))
+    prediction_directory_name = "{0}_{1}_{2}".format(model_name, args.dataset, current_date_time)
+
+    os.mkdir("predictions/{0}".format(prediction_directory_name))
+
+    # for batches
+    for idx, batch in enumerate(test_batch_metadata):
+        metadata["batch_{0}".format(idx)] = []
+
+        # for sample in batch
+        for idy, sample in enumerate(batch):
+            sample_timesteps = []
+            
+            # for timestep in sample
+            for timestep in sample:
+                vh_vv_pair = {"vh": timestep[0], "vv": timestep[1]}
+                sample_timesteps.append(vh_vv_pair)
+
+            # The name of the prediction produced by this sample
+            prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
+
+            sample_data = {"sample{0}".format(idy): sample_timesteps, prediction: prediction_file_name}
+            metadata["batch_{0}".format(idx)].append(sample_data)
+
+
+
+    with open('predictions/{0}/{1}_{2}_batch_metadata_{3}.json'.format(prediction_directory_name, model_name, args.dataset, current_date_time), 'w') as fp:
+        json.dump(metadata, fp, indent=4)
+
+    print("samples:" + len(predictions * model_batch_size))
+
+    # set to -1 to account for 0 mod 4 = 0 in batch_indexing
+    batch_index = -1
     for idy, image in enumerate(predictions):
-        # print(len(images))
-        # for idx, image in enumerate(images):
-        if(idy % 2 == 0):
-            img = array_to_img(image)
-            filename = "predictions/prediction_{0}.tif".format(idy)
-            img.save(filename)
+        if idy % model_batch_size == 0:
+            batch_index += 1
+
+        img = array_to_img(image)
+        filename = "predictions/{0}/prediction_batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+        img.save(filename)
                 
     # plot_predictions(
     #     predictions, test_iter

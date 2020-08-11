@@ -54,19 +54,6 @@ def train_model(
         if verbose > 0:
             print(f"Epoch {epoch}/{epochs}")
 
-        # history = model.fit_generator(
-        #     training_set,
-        #     steps_per_epoch=step_size_training,
-        #     epochs=1,
-        #     validation_data=test_set,
-        #     validation_steps=step_size_vaild,
-        #     verbose=verbose
-        # )
-        
-        #set aside last ~25% of data for validation
-        # reduced_size = floor(0.25 * len(training_set_x[0]))
-        # history = model.fit(training_set_x, validation_data=test_set, epochs=1, verbose=verbose)
-        
         clear_session()
         
         history = model.fit(
@@ -149,11 +136,14 @@ def test_model_timeseries(
         return masked_predictions, dataset_data[0], dataset_data[1]
 
     else:
-        test_metadata, test_iter = load_test_timeseries_dataset(dataset)
+        _, test_iter = load_test_timeseries_dataset(dataset)
         predictions = model.predict(
             test_iter, verbose=verbose
         )
-        # test_iter.reset()
+
+        # in case our data is shuffled, keep track of which order and batch they're in
+        batch_metadata = test_iter.getBatchMetadata()
+
         masked_predictions = predictions.round(decimals=0, out=None)
 
-        return masked_predictions, test_metadata
+        return masked_predictions, batch_metadata
