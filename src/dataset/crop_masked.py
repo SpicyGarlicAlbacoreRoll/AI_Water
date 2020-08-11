@@ -202,7 +202,7 @@ def make_timeseries_metadata(
                                 timeseries_path, file_dir, mask_name
                             )
                         )
-                        print("LENGTH OF DATA:\t", len(data_frame[0]))
+                        # print("LENGTH OF DATA:\t", len(data_frame[0]))
                         # print("LENGTH OF DATA:\t", len(data[0][0]), "\n")
                         if len(data_frame[0]) != 0:
                             data.append(data_frame)
