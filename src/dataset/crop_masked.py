@@ -9,6 +9,7 @@ from math import floor
 import re
 from math import floor
 from typing import Generator, Optional, Tuple
+from random import Random
 
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator, Iterator
@@ -54,6 +55,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
     # print("\nX data shape:\t", x_train.shape)
     # print("Y data shape:\t", y_train.shape)
+
+    # shuffle our data for validation split
+    Random(64).shuffle(flattened_list)
+
     validation_split = .25
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
