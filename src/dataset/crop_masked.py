@@ -9,6 +9,7 @@ from math import floor
 import re
 from math import floor
 from typing import Generator, Optional, Tuple
+from random import Random
 
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator, Iterator
@@ -30,10 +31,19 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
     train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
-    sample_size = len(train_metadata[0])
-    time_steps = len(train_metadata[0][0][0])
-    print("Sample Size:\t", sample_size)
-    print("Time Steps:\t", time_steps)
+    print("\n# of datasets:\t", len(train_metadata))
+    flattened_list = []
+
+    for subset in train_metadata:
+        for time_series_mask_pair in subset:
+            flattened_list.append(time_series_mask_pair)
+
+    sample_size = len(flattened_list)
+    time_steps = max(len(x[0]) for x in flattened_list)
+    # time_steps = len(flattened_list[0][0])
+    print("\tCombined Sample Size:\t", sample_size)
+    print("\tMax Time Steps:\t", time_steps)
+    print("\n")
 
     # pre-allocate for inserting by index
     # x_train = np.empty((sample_size, time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
@@ -45,11 +55,15 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
     # print("\nX data shape:\t", x_train.shape)
     # print("Y data shape:\t", y_train.shape)
+
+    # shuffle our data for validation split
+    Random(64).shuffle(flattened_list)
+
     validation_split = .25
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
-        train_metadata[0][:-split_index],
-        batch_size=4,
+        flattened_list[:-split_index],
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -58,8 +72,8 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         n_classes=2,
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
-        train_metadata[0][-split_index:],
-        batch_size=3,
+        flattened_list[-split_index:],
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -144,8 +158,9 @@ def make_timeseries_metadata(
             for file_dir in timeseries_dirs:
                 for data_point_path, _, files in os.walk(os.path.join(timeseries_path, file_dir)):
                     # print(files)
-                    print(data_point_path)
-
+                    
+                    print("\ndataset folder path:\t", data_point_path)
+                    print("\t# of files:\t\t", len(files))
                     # our list of time series frames + masks that will be appended to test and train metadata
                     data = []
 
@@ -207,15 +222,19 @@ def make_timeseries_metadata(
                         if len(data_frame[0]) != 0:
                             data.append(data_frame)
 
+                    print("\t# of valid frames:\t", len(data))
 
                     if edit:
-                        if data_dir == 'test' or data_dir == 'train' and len(data[0]) !=0:
-                            train_metadata.append(data)
+                        if data_dir == 'test' or data_dir == 'train' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                train_metadata.append(data)
                     else:
-                        if data_dir == 'train' and len(data[0]) !=0:
-                            train_metadata.append(data)
-                        elif data_dir == 'test' and len(data[0]) !=0:
-                            test_metadata.append(data)
+                        if data_dir == 'train' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                train_metadata.append(data)
+                        elif data_dir == 'test' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                test_metadata.append(data)
 
     return train_metadata, test_metadata
 
@@ -301,6 +320,15 @@ def validate_image(path: str, dir: str, image: str) -> bool:
     # if not edit:
     tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
     if not valid_image(tile_array):
+        return False
+    
+    return True
+
+def validate_mask(mask: str) -> bool:
+    try:
+        with gdal_open(mask) as f:
+            tile_vv_array = f.ReadAsArray()
+    except FileNotFoundError:
         return False
     
     return True
