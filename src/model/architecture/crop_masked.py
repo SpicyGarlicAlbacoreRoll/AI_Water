@@ -157,9 +157,12 @@ def create_cdl_model_masked(
     # outputs = TimeDistributed(Conv2D(2, 1, activation='softmax', name='last_layer'))(c13)
 
     #V1.1.3
-    lstm_layer_0 = ConvLSTM2D(2, (1, 1), name='last_layer', return_sequences=True)(c13)
-    lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer',  activation='softmax')(lstm_layer_0)
-    # outputs = BatchNormalization()(lstm_layer_1)
+    lstm_layer_0 = ConvLSTM2D(2, (1, 1), return_sequences=True)(c13)
+    normalized = BatchNormalization()(lstm_layer_0)
+    lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer',  activation='softmax')(normalized)
+    outputs = BatchNormalization()(lstm_layer_1)
+    outputs_reshaped = Reshape((1, dems, dems, 2))(outputs)
+    
     # output = Conv3D( filters=1, kernel_size=(3, 3, 3), activation="sigmoid", padding="same")(outputs)
     # normalized_output = BatchNormalization()(outputs)
     # # averaged = AveragePooling3D()
@@ -170,12 +173,12 @@ def create_cdl_model_masked(
     # lstm = LSTM(2)(outputs)
     # final = Dense(1, activation='sigmoid')(lstm)
 
-    model = Model(inputs=lstm_layer_1, outputs=[outputs])
+    model = Model(inputs=inputs, outputs=[outputs_reshaped])
 
     model.__asf_model_name = model_name
 
     model.compile(
-        loss='binary_crossentropy', optimizer=Adam(), metrics=["accuracy"]
+        loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=["sparse_categorical_accuracy"]
     )
 
     return model

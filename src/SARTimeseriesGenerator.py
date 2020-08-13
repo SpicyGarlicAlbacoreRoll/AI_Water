@@ -66,7 +66,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 except FileNotFoundError:
                     continue
                 
-                tile_array = np.stack((vh, vv), axis=2).astype('float32')
+                tile_array = np.stack((vh, vv), axis=2).astype('float32') / 255.0
 
                 if self.clip_range:
                     min_, max_ = self.clip_range
@@ -97,12 +97,14 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 with gdal_open(mask) as f:
                     mask = f.ReadAsArray()
                 
-                mask_array = np.array(mask).astype('float32').reshape(512, 512, 1)
+                # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
+                mask_array = np.array(mask).astype('uint8').reshape(512, 512, 1)
 
                 X[sample_idx,] = x_stack
                 y[sample_idx,] = mask_array
         
-        return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
+        # return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
+        return np.nan_to_num(X, nan=0, copy=False), np.nan_to_num(y, nan=0, copy=False)
 
 
     # Non-keras.utils.Sequence functions

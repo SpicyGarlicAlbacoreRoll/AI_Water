@@ -63,23 +63,23 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
         flattened_list[:-split_index],
-        batch_size=4,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        n_classes=3,
+        n_classes=2,
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
         flattened_list[-split_index:],
-        batch_size=4,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        n_classes=3,
+        n_classes=2,
         shuffle=True)
     return train_iter, validation_iter
 
@@ -103,13 +103,13 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata
     
     test_iter = SARTimeseriesGenerator(
         flattened_list,
-        batch_size=4,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        n_classes=3,
+        n_classes=2,
         shuffle=False)
     
     return test_metadata, test_iter

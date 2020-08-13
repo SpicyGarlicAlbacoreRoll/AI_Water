@@ -36,7 +36,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": []}
+        history = {"loss": [], "sparse_categorical_accuracy": [], "val_loss": [], "val_sparse_categorical_accuracy": []}
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -90,8 +90,8 @@ def test_wrapper(args: Namespace) -> None:
             timeseries_mask_pair["timesteps"] = sample_timesteps
             # The name of the prediction produced by this sample
 
-            prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
-
+            # prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
+            prediction_file_name="predictions/{0}/batch_{1}".format(prediction_directory_name, idx, idy)
             sample_data = {"sample_{0}".format(idy): timeseries_mask_pair, "prediction": prediction_file_name}
             samples.append(sample_data)
 
@@ -104,18 +104,21 @@ def test_wrapper(args: Namespace) -> None:
 
     print("samples:" + str(len(predictions * model_batch_size)))
 
+    for idx in range(len(test_batch_metadata)):
+        os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, idx))
     # set to -1 to account for 0 mod 4 = 0 in batch_indexing
-    os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, str(0)))
-    batch_index = -1
-    for idy, image_preds in enumerate(predictions):
-        os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, str(batch_index + 2)))
-        for idx, image in enumerate(image_preds):
-            if idy % model_batch_size == 0:        
-                batch_index += 1
+    
+    batch_index = 0
+    for idy, image in enumerate(predictions):
+        if idy % model_batch_size == 0 and idy != 0:        
+            batch_index += 1
 
-            img = array_to_img(image)
-            filename = "predictions/{0}/batch_{1}/sample_{2}_frame{3}.tif".format(prediction_directory_name, batch_index, idy, idx)
-            img.save(filename)
+        img_0 = array_to_img(image[:,:,0].reshape(512, 512, 1))
+        img_1 = array_to_img(image[:,:,1].reshape(512, 512, 1))
+        filename_0 = "predictions/{0}/batch_{1}/sample_{2}_class_0.tif".format(prediction_directory_name, batch_index, idy)
+        filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
+        img_0.save(filename_0)
+        img_1.save(filename_1)
                 
     # plot_predictions(
     #     predictions, test_iter
