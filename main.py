@@ -71,12 +71,12 @@ def test_wrapper(args: Namespace) -> None:
 
     # for batches
     for idx, batch in enumerate(test_batch_metadata):
-        print(len(batch))
+        # print(len(batch))
         metadata["batch_{0}".format(idx)] = []
         samples = []
         # for sample in batch
         for idy, sample in enumerate(batch):
-            print(len(sample))
+            # print(len(sample))
             timeseries_mask_pair = {}
             # for timestep in sample
             sample_timesteps = []
@@ -113,8 +113,8 @@ def test_wrapper(args: Namespace) -> None:
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
 
-        img_0 = array_to_img(image[:,:,0].reshape(512, 512, 1))
-        img_1 = array_to_img(image[:,:,1].reshape(512, 512, 1))
+        img_0 = array_to_img(image[0,:,:,0].reshape(512, 512, 1))
+        img_1 = array_to_img(image[0,:,:,1].reshape(512, 512, 1))
         filename_0 = "predictions/{0}/batch_{1}/sample_{2}_class_0.tif".format(prediction_directory_name, batch_index, idy)
         filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
         img_0.save(filename_0)
