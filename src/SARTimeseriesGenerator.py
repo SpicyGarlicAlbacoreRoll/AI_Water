@@ -3,11 +3,11 @@
 
 import numpy as np
 from src.gdal_wrapper import gdal_open
-from typing import Optional, Tuple
+from typing import Optional, List, Tuple
 import keras
 
 class SARTimeseriesGenerator(keras.utils.Sequence):
-    def __init__(self, time_series_mask_list, batch_size=32, dim=(512, 512), time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, n_classes=2, shuffle=True, clip_range: Optional[Tuple[float, float]] = None):
+    def __init__(self, time_series_mask_list, batch_size=32, dim=(512, 512), time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, n_classes=3, shuffle=True, clip_range: Optional[Tuple[float, float]] = None):
         self.list_IDs = time_series_mask_list
         # self.masks = masks
 
@@ -45,7 +45,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
 
     def __data_generation(self, list_IDs_temp):
-        setBatchMetadata(list_IDs_temp)
+        self.setBatchMetadata(list_IDs_temp)
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
         y = np.zeros((self.batch_size, 1, *self.output_dim, self.output_channels), dtype=np.float32)
@@ -102,16 +102,16 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 X[sample_idx,] = x_stack
                 y[sample_idx,] = mask_array
         
-        return X, y
+        return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
 
 
     # Non-keras.utils.Sequence functions
 
     # accessor to get metadata, ordered by input, contains strings of file paths and their 
     # crop mask in the order they're fed to the model
-    def getBatchMetadata() -> List[Tuple[List[Tuple[str, str]], str]]:
+    def getBatchMetadata(self) -> List[Tuple[List[Tuple[str, str]], str]]:
         return self.metadata
 
     # when each batch begins we record what files are passed to the model
-    def setBatchMetadata(batch: Tuple[List[Tuple[str, str]], str]):
+    def setBatchMetadata(self, batch: Tuple[List[Tuple[str, str]], str]):
         self.metadata.append(batch)

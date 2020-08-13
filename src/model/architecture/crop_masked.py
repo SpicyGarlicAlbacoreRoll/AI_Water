@@ -2,12 +2,14 @@
     Contains the architecture for creating a cropland data layer within SAR images.
 """
 from tensorflow.python.framework.ops import disable_eager_execution
-from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D
+from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D, Reshape, AveragePooling3D, Conv3D
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.merge import concatenate
 from keras.layers.pooling import MaxPooling2D
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.losses import BinaryCrossentropy
+from keras.metrics import MeanIoU
 from src.config import NETWORK_DEMS as dems
 
 
@@ -151,18 +153,29 @@ def create_cdl_model_masked(
         u13, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
 
-    # outputs = TimeDistributed(Conv2D(1, (1, 1), activation='sigmoid', name='last_layer'))(c13)
-    outputs = ConvLSTM2D(1, (1, 1), activation='sigmoid', name='last_layer')(c13)
+    #V1.1.2
+    # outputs = TimeDistributed(Conv2D(2, 1, activation='softmax', name='last_layer'))(c13)
+
+    #V1.1.3
+    lstm_layer_0 = ConvLSTM2D(2, (1, 1), name='last_layer', return_sequences=True)(c13)
+    lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer',  activation='softmax')(lstm_layer_0)
+    # outputs = BatchNormalization()(lstm_layer_1)
+    # output = Conv3D( filters=1, kernel_size=(3, 3, 3), activation="sigmoid", padding="same")(outputs)
+    # normalized_output = BatchNormalization()(outputs)
+    # # averaged = AveragePooling3D()
+    # LSTM_to_conv_dims = (-1, dems, dems, 1)
+    # reshaped = Reshape(LSTM_to_conv_dims)(normalized_output)
+    # output = Conv2D(3, (3, 3), activation='relu', padding='same')(reshaped)
     # outputs = TimeDistributed(Flatten())(outputs)
     # lstm = LSTM(2)(outputs)
     # final = Dense(1, activation='sigmoid')(lstm)
 
-    model = Model(inputs=inputs, outputs=[outputs])
+    model = Model(inputs=lstm_layer_1, outputs=[outputs])
 
     model.__asf_model_name = model_name
 
     model.compile(
-        loss='mean_squared_error', optimizer=Adam(), metrics=['accuracy']
+        loss='binary_crossentropy', optimizer=Adam(), metrics=["accuracy"]
     )
 
     return model

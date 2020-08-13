@@ -69,7 +69,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        n_classes=2,
+        n_classes=3,
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
         flattened_list[-split_index:],
@@ -79,12 +79,12 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        n_classes=2,
+        n_classes=3,
         shuffle=True)
     return train_iter, validation_iter
 
 def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata, Iterator]:
-    train_metadata, test_metadata = make_timeseries_metadata(dataset)
+    train_metadata, test_metadata = make_timeseries_metadata(dataset, training=False)
 
 
     print("\n# of datasets:\t", len(test_metadata))
@@ -109,7 +109,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        n_classes=2,
+        n_classes=3,
         shuffle=False)
     
     return test_metadata, test_iter
@@ -153,14 +153,19 @@ def load_replace_timeseries_data(
 
 def make_timeseries_metadata(
     dataset: str,
-    edit: bool = False
+    edit: bool = False,
+    training: bool = True,
 ) -> Tuple[MaskedTimeseriesMetadata, MaskedTimeseriesMetadata]:
     """ Returns two lists of metadata. One for the training data and one for the
     testing data. """
     train_metadata = []
     test_metadata = []
 
-    dirs = ["train", "test"]
+    dirs = []
+    if training:
+        dirs = ["train"]
+    else:
+        dirs = ["test"]
 
     # expectation that train and test will be root dataset directories
     for data_dir in dirs:

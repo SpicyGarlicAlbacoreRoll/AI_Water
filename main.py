@@ -71,39 +71,51 @@ def test_wrapper(args: Namespace) -> None:
 
     # for batches
     for idx, batch in enumerate(test_batch_metadata):
+        print(len(batch))
         metadata["batch_{0}".format(idx)] = []
-
+        samples = []
         # for sample in batch
         for idy, sample in enumerate(batch):
-            sample_timesteps = []
-            
+            print(len(sample))
+            timeseries_mask_pair = {}
             # for timestep in sample
-            for timestep in sample:
-                vh_vv_pair = {"vh": timestep[0], "vv": timestep[1]}
+            sample_timesteps = []
+            for vv, vh in sample[0]:
+                
+                # for vh, vv in timeseries:
+                vh_vv_pair = {"vh": vh, "vv": vv}
                 sample_timesteps.append(vh_vv_pair)
-
+            
+            timeseries_mask_pair["mask"] = sample[1]
+            timeseries_mask_pair["timesteps"] = sample_timesteps
             # The name of the prediction produced by this sample
+
             prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
 
-            sample_data = {"sample{0}".format(idy): sample_timesteps, prediction: prediction_file_name}
-            metadata["batch_{0}".format(idx)].append(sample_data)
+            sample_data = {"sample_{0}".format(idy): timeseries_mask_pair, "prediction": prediction_file_name}
+            samples.append(sample_data)
+
+        metadata["batch_{0}".format(idx)].append(samples)
 
 
 
     with open('predictions/{0}/{1}_{2}_batch_metadata_{3}.json'.format(prediction_directory_name, model_name, args.dataset, current_date_time), 'w') as fp:
         json.dump(metadata, fp, indent=4)
 
-    print("samples:" + len(predictions * model_batch_size))
+    print("samples:" + str(len(predictions * model_batch_size)))
 
     # set to -1 to account for 0 mod 4 = 0 in batch_indexing
+    os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, str(0)))
     batch_index = -1
-    for idy, image in enumerate(predictions):
-        if idy % model_batch_size == 0:
-            batch_index += 1
+    for idy, image_preds in enumerate(predictions):
+        os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, str(batch_index + 2)))
+        for idx, image in enumerate(image_preds):
+            if idy % model_batch_size == 0:        
+                batch_index += 1
 
-        img = array_to_img(image)
-        filename = "predictions/{0}/prediction_batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
-        img.save(filename)
+            img = array_to_img(image)
+            filename = "predictions/{0}/batch_{1}/sample_{2}_frame{3}.tif".format(prediction_directory_name, batch_index, idy, idx)
+            img.save(filename)
                 
     # plot_predictions(
     #     predictions, test_iter
