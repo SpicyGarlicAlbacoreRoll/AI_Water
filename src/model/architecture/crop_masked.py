@@ -1,13 +1,15 @@
 """
     Contains the architecture for creating a cropland data layer within SAR images.
 """
-
-from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed
+from tensorflow.python.framework.ops import disable_eager_execution
+from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D, Reshape, AveragePooling3D, Conv3D
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.merge import concatenate
 from keras.layers.pooling import MaxPooling2D
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.losses import BinaryCrossentropy
+from keras.metrics import MeanIoU
 from src.config import NETWORK_DEMS as dems
 
 
@@ -28,6 +30,8 @@ def conv2d_block_time_dist(
             padding='same'
         )
     )(input_tensor)
+    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
+
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
@@ -40,6 +44,8 @@ def conv2d_block_time_dist(
             padding='same'
         )
     )(input_tensor)
+
+    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
@@ -60,11 +66,11 @@ def create_cdl_model_masked(
     """ Function to define the Time Distributed UNET Model """
 
     """Requires stack of Sequential SAR data (with vh vv channels stacked), where each image is a different timestep"""
-    inputs = Input(shape=(time_steps, dems, dems, 2))
-
+    inputs = Input(shape=(None, dems, dems, 2), batch_size=None)
     c1 = conv2d_block_time_dist(
         inputs, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
+
     p1 = TimeDistributed(MaxPooling2D((2, 2)))(c1)
     p1 = TimeDistributed(Dropout(dropout))(p1)
 
@@ -78,7 +84,7 @@ def create_cdl_model_masked(
 
     c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
-    p4 = Dropout(dropout)(p4)
+    p4 = TimeDistributed(Dropout(dropout))(p4)
 
     c5 = conv2d_block_time_dist(p4, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p5 = TimeDistributed(MaxPooling2D((2, 2)))(c5)
@@ -147,13 +153,32 @@ def create_cdl_model_masked(
         u13, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
 
-    outputs = TimeDistributed(Conv2D(1, (1, 1), activation='sigmoid', name='last_layer'))(c13)
-    model = Model(inputs=inputs, outputs=[outputs])
+    #V1.1.2
+    # outputs = TimeDistributed(Conv2D(2, 1, activation='softmax', name='last_layer'))(c13)
+
+    #V1.1.3
+    lstm_layer_0 = ConvLSTM2D(2, (1, 1), return_sequences=True)(c13)
+    normalized = BatchNormalization()(lstm_layer_0)
+    lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer',  activation='softmax')(normalized)
+    outputs = BatchNormalization()(lstm_layer_1)
+    outputs_reshaped = Reshape((1, dems, dems, 2))(outputs)
+    
+    # output = Conv3D( filters=1, kernel_size=(3, 3, 3), activation="sigmoid", padding="same")(outputs)
+    # normalized_output = BatchNormalization()(outputs)
+    # # averaged = AveragePooling3D()
+    # LSTM_to_conv_dims = (-1, dems, dems, 1)
+    # reshaped = Reshape(LSTM_to_conv_dims)(normalized_output)
+    # output = Conv2D(3, (3, 3), activation='relu', padding='same')(reshaped)
+    # outputs = TimeDistributed(Flatten())(outputs)
+    # lstm = LSTM(2)(outputs)
+    # final = Dense(1, activation='sigmoid')(lstm)
+
+    model = Model(inputs=inputs, outputs=[outputs_reshaped])
 
     model.__asf_model_name = model_name
 
     model.compile(
-        loss='mean_squared_error', optimizer=Adam(), metrics=['accuracy']
+        loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=["sparse_categorical_accuracy"]
     )
 
     return model

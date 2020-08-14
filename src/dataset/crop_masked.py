@@ -4,174 +4,346 @@ the prepared data set for use.
 """
 
 import os
+import tensorflow as tf
+from math import floor
 import re
+from math import floor
 from typing import Generator, Optional, Tuple
+from random import Random
 
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator, Iterator
+from keras.preprocessing.sequence import TimeseriesGenerator
 from osgeo import gdal
 
+from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from ..gdal_wrapper import gdal_open
-from ..asf_typing import MaskedDatasetMetadata
+from ..asf_typing import MaskedDatasetMetadata, MaskedTimeseriesMetadata
 from .common import dataset_dir, valid_image
-from ..config import NETWORK_DEMS
+from ..config import NETWORK_DEMS, TIMESTEPS
 
 TILE_REGEX = re.compile(r"(.*)\.vh(.*)\.(tiff|tif|TIFF|TIF)")
+TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
+# TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH\.(tiff|tif|TIFF|TIF)")
 
 
-def load_dataset(dataset: str) -> Tuple[Iterator, Iterator]:
-    train_gen = ImageDataGenerator(rescale=10)
-    test_gen = ImageDataGenerator(rescale=10)
+def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
-    train_metadata, test_metadata = make_timerseries_metadata(dataset)
-    # Load the entire dataset into memory
-    x_train = []
-    y_train = []
-    for img, mask in generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2)):
-        x_train.append(img)
-        y_train.append(mask)
+    train_metadata, test_metadata = make_timeseries_metadata(dataset)
 
-    x_test = []
-    y_test = []
+    print("\n# of datasets:\t", len(train_metadata))
+    flattened_list = []
 
-    for img, mask in generate_timeseries_from_metadata(test_metadata, clip_range=(0, 2)):
-        x_test.append(img)
-        y_test.append(mask)
+    for subset in train_metadata:
+        for time_series_mask_pair in subset:
+            flattened_list.append(time_series_mask_pair)
 
-    train_iter = train_gen.flow(
-        np.array(x_train), y=np.array(y_train), batch_size=16
-    )
-    test_iter = test_gen.flow(
-        np.array(x_test), y=np.array(y_test), batch_size=1, shuffle=False
-    )
+    sample_size = len(flattened_list)
+    time_steps = max(len(x[0]) for x in flattened_list)
+    # time_steps = len(flattened_list[0][0])
+    print("\tCombined Sample Size:\t", sample_size)
+    print("\tMax Time Steps:\t", time_steps)
+    print("\n")
 
-    return train_iter, test_iter
+    # pre-allocate for inserting by index
+    # x_train = np.empty((sample_size, time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    # y_train = np.empty((sample_size, 1, NETWORK_DEMS, NETWORK_DEMS, 1))
+
+    # for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2))):
+    #     x_train[idx, :] = time_stack
+    #     y_train[idx, :] = mask
+
+    # print("\nX data shape:\t", x_train.shape)
+    # print("Y data shape:\t", y_train.shape)
+
+    # shuffle our data for validation split
+    Random(64).shuffle(flattened_list)
+
+    validation_split = .25
+    split_index = floor(sample_size * validation_split)
+    train_iter = SARTimeseriesGenerator(
+        flattened_list[:-split_index],
+        batch_size=1,
+        dim=(NETWORK_DEMS, NETWORK_DEMS),
+        time_steps=time_steps,
+        n_channels=2,
+        output_dim=(NETWORK_DEMS, NETWORK_DEMS),
+        output_channels=1,
+        n_classes=2,
+        shuffle=True)
+    validation_iter = SARTimeseriesGenerator(
+        flattened_list[-split_index:],
+        batch_size=1,
+        dim=(NETWORK_DEMS, NETWORK_DEMS),
+        time_steps=time_steps,
+        n_channels=2,
+        output_dim=(NETWORK_DEMS, NETWORK_DEMS),
+        output_channels=1,
+        n_classes=2,
+        shuffle=True)
+    return train_iter, validation_iter
+
+def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata, Iterator]:
+    train_metadata, test_metadata = make_timeseries_metadata(dataset, training=False)
 
 
-def load_replace_data(
+    print("\n# of datasets:\t", len(test_metadata))
+    flattened_list = []
+
+    for subset in test_metadata:
+        for time_series_mask_pair in subset:
+            flattened_list.append(time_series_mask_pair)
+
+    sample_size = len(flattened_list)
+    time_steps = max(len(x[0]) for x in flattened_list)
+    # time_steps = len(flattened_list[0][0])
+    print("\tCombined Sample Size:\t", sample_size)
+    print("\tMax Time Steps:\t", time_steps)
+    print("\n")
+    
+    test_iter = SARTimeseriesGenerator(
+        flattened_list,
+        batch_size=1,
+        dim=(NETWORK_DEMS, NETWORK_DEMS),
+        time_steps=time_steps,
+        n_channels=2,
+        output_dim=(NETWORK_DEMS, NETWORK_DEMS),
+        output_channels=1,
+        n_classes=2,
+        shuffle=False)
+    
+    return test_metadata, test_iter
+
+
+def load_replace_timeseries_data(
     dataset: str,
     dems=NETWORK_DEMS
 ) -> Tuple[Iterator, MaskedDatasetMetadata]:
 
-    replace_gen = ImageDataGenerator(rescale=10)
-    metadata, _ = make_timerseries_metadata(dataset, edit=True)
+    #replace_gen = ImageDataGenerator(rescale=10)
+    metadata, _ = make_timeseries_metadata(dataset, edit=True)
 
     # Load the entire dataset into memory
-    x_replace = []
-    y_replace = []
-    for img, mask in generate_timeseries_from_metadata(
-        metadata,
-        edit=True,
-        clip_range=(0, 2),
-        dems=dems
-    ):
-        x_replace.append(img)
-        y_replace.append(mask)
-
-    replace_iter = replace_gen.flow(
-        np.array(x_replace), y=np.array(y_replace), batch_size=1, shuffle=False
-    )
+    # batch_size = len(metadata[0])
+    batch_size = 1
+    time_steps = len(metadata[0][0][0])
+    print("Batch Size:\t", batch_size)
+    print("Time Steps:\t", time_steps)
+    # x_train = np.empty((1862, 786432))
+    x_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
+    # x_train = np.empty((266, 9, 512, 512, 3))
+    # y_train = []
+    # y_train = np.empty((1862, 262144))
+    y_train = np.empty((266 * time_steps, NETWORK_DEMS, NETWORK_DEMS, 1))
+    # y_train = np.empty((266, 9, 512, 512, 1))
+    for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(metadata, clip_range=(0, 2))):
+        # x_train.concat(time_stack)
+        # y_train.concat(mask)
+        x_train[idx, :] = time_stack
+        y_train[idx, :] = mask
+    # replace_iter = TimeseriesGenerator(x_train, batch_size=1, length = time_steps)
+    replace_iter = TimeseriesGenerator(
+        x_train, batch_size=batch_size, stride=time_steps, sampling_rate=1, targets=y_train, length=time_steps)
+    # replace_iter = replace_gen.flow(
+    #    np.array(x_replace), y=np.array(y_replace), batch_size=1, shuffle=False
+    # )
 
     return replace_iter, metadata
 
 
-def make_timerseries_metadata(
+def make_timeseries_metadata(
     dataset: str,
-    edit: bool = False
+    edit: bool = False,
+    training: bool = True,
 ) -> Tuple[MaskedTimeseriesMetadata, MaskedTimeseriesMetadata]:
     """ Returns two lists of metadata. One for the training data and one for the
     testing data. """
     train_metadata = []
     test_metadata = []
 
-    for dirpath, dirnames, filenames in os.walk(dataset_dir(dataset)):
-        for timeseries_path, timeseries_dirname, timeseries_filenames in os.walk(os.join(dirpath, dirnames)):
-            
-            time_series_data = []
-            timeseries_mask = ""
-            
-            for name in sorted(timeseries_filenames):
-                m = re.match(TILE_REGEX, name)
-                if not m:
-                    continue
-                
+    dirs = []
+    if training:
+        dirs = ["train"]
+    else:
+        dirs = ["test"]
 
-                pre, end, ext = m.groups()
-    
-                # mask = f"{pre}.mask{end}.{ext}"
-                crop_mask_file = re.search("mask", name)
+    # expectation that train and test will be root dataset directories
+    for data_dir in dirs:
+        for timeseries_path, timeseries_dirs, timeseries_files in os.walk(os.path.join(dataset_dir(dataset), data_dir)):
+            for file_dir in timeseries_dirs:
+                for data_point_path, _, files in os.walk(os.path.join(timeseries_path, file_dir)):
+                    # print(files)
+                    
+                    print("\ndataset folder path:\t", data_point_path)
+                    print("\t# of files:\t\t", len(files))
+                    # our list of time series frames + masks that will be appended to test and train metadata
+                    data = []
 
-                if crop_mask_file:
-                    crop_mask_path = os.path.join(dirpath, timeseries_path, crop_mask_file.group())
-                
-                vh_name = f"{pre}.vh{end}.{ext}"
-                vv_name = f"{pre}.vv{end}.{ext}"
-    
-                data = (
-                    os.path.join(dirpath, timeseries_path, vh_name), os.path.join(dirpath, timeseries_path, vv_name)
-                    )
-                
-                time_series_data.append(data)
+                    # keep track of frames that have already been stacked
+                    frames = []
+                    for tile_name in files:
+                        m = re.match(TITLE_TIME_SERIES_REGEX, tile_name)
+                        if not m:
+                            continue
 
-            # each data point is a list of time series vv + vh pairs with corresponding cropland masks
-            data = (time_series_data, crop_mask_path)
+                        pre, end, ext = m.groups()
 
-            folder = os.path.basename(dirpath)
-    
-            if edit:
-                if folder == 'test' or folder == 'train':
-                    train_metadata.append(data)
-            else:
-                if folder == 'train':
-                    train_metadata.append(data)
-                elif folder == 'test':
-                    test_metadata.append(data)
+                        tile_time_series_data = []
+                        frame_index = end
+                        VV_Tiles = []
+
+                        # If we've already gotten a time stack of this frame index, skip
+                        if frame_index not in frames:
+                            VV_Tiles = [
+                                tileVV for tileVV in sorted(files)
+                                if re.match(fr"(.*)\_VV{end}\.(tif|tiff)", tileVV) and validate_image(timeseries_path, file_dir, tileVV)
+                            ]
+                            frames.append(end)
+                        else:
+                            continue
+
+                        # for testing purposes
+                        mask_name = f"CDL_IA_2019_mask{end}.{ext}"
+
+                        
+                        # Get VV VH Pair
+                        if(len(VV_Tiles) > 0):
+                            for tileVV in VV_Tiles:
+                                tile_time_series_data.append(
+                                    (
+                                        os.path.join(
+                                            timeseries_path, file_dir, tileVV
+                                        ),
+                                        os.path.join(
+                                            timeseries_path, file_dir, tileVV.replace("VV", "VH"))
+                                    )
+                                )
+
+                        # get mask name for specific frame
+                        for mask in sorted(files):
+                            if re.search(fr"(.*)\_mask{end}\.(tif|tiff)", mask):
+                                mask_name = mask
+                                # print(mask_name)
+                                break
+                        # The timestack with mask tuple(list(tuple(vv, vh)), mask)
+                        data_frame = (
+                            tile_time_series_data,
+                            os.path.join(
+                                timeseries_path, file_dir, mask_name
+                            )
+                        )
+                        # print("LENGTH OF DATA:\t", len(data_frame[0]))
+                        # print("LENGTH OF DATA:\t", len(data[0][0]), "\n")
+                        if len(data_frame[0]) != 0:
+                            data.append(data_frame)
+
+                    print("\t# of valid frames:\t", len(data))
+
+                    if edit:
+                        if data_dir == 'test' or data_dir == 'train' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                train_metadata.append(data)
+                    else:
+                        if data_dir == 'train' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                train_metadata.append(data)
+                        elif data_dir == 'test' and len(data) != 0:
+                            if len(data[0]) !=0:
+                                test_metadata.append(data)
 
     return train_metadata, test_metadata
 
 
 def generate_timeseries_from_metadata(
-    metadata: MaskedDatasetMetadata,
+    metadata: MaskedTimeseriesMetadata,
     clip_range: Optional[Tuple[float, float]] = None,
     edit: bool = False,
-    dems=NETWORK_DEMS
+    dems=NETWORK_DEMS,
+    timesteps=TIMESTEPS
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """ Yield training images and masks from the given metadata. """
-    output_shape = (dems, dems, 2)
+    output_shape = (timesteps, dems, dems, 3)
     mask_output_shape = (dems, dems, 1)
-    for tile_vh, tile_vv, mask_name in metadata:
-        tif_vh = gdal.Open(tile_vh)
 
-        # Should prevent the following error
-        # ValueError: cannot reshape array of size 524288 into shape (64,64,2)
-        comp = str(tif_vh.RasterXSize)
-        if(comp != str(dems) and "mock" not in comp):
-            # mock is include for the unit tests
-            continue
-        try:
-            with gdal_open(tile_vh) as f:
-                tile_vh_array = f.ReadAsArray()
-        except FileNotFoundError:
-            continue
-        try:
-            with gdal_open(tile_vv) as f:
-                tile_vv_array = f.ReadAsArray()
-        except FileNotFoundError:
-            continue
+    for time_series_mask_pairs in metadata:
+        for time_series, mask in time_series_mask_pairs:
+            time_stack = []
 
-        tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
+            for tileVH, tileVV in sorted(time_series):
+                tif_vh = gdal.Open(tileVH)
 
-        if not edit:
-            if not valid_image(tile_array):
-                continue
+                comp = str(tif_vh.RasterXSize)
+                if(comp != str(dems) and "mock" not in comp):
+                    continue
+                try:
+                    with gdal_open(tileVH) as f:
+                        tile_vh_array = f.ReadAsArray()
+                except FileNotFoundError:
+                    continue
+                try:
+                    with gdal_open(tileVV) as f:
+                        tile_vv_array = f.ReadAsArray()
+                except FileNotFoundError:
+                    continue
 
-        with gdal_open(mask_name) as f:
-            mask_array = f.ReadAsArray()
+                # blue_channel = np.multiply(np.add(tile_vh_array, tile_vv_array), 0.5)
 
-        x = np.array(tile_array).astype('float32')
-        y = np.array(mask_array).astype('float32')
-        # Clip all x values to a fixed range
-        if clip_range:
-            min_, max_ = clip_range
-            np.clip(x, min_, max_, out=x)
-        yield (x.reshape(output_shape), y.reshape(mask_output_shape))
+                tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
+
+                # if not edit:
+                #     if not valid_image(tile_array):
+                #         continue
+
+                x = np.array(tile_array).astype('float32')
+
+                if clip_range:
+                    min_, max_ = clip_range
+                    np.clip(x, min_, max_, out=x)
+
+                time_stack.append(x)
+
+            if len(time_stack) != 0:
+                x_stack = np.stack(time_stack, 0).astype('float32')
+                with gdal_open(mask) as f:
+                    mask_array = f.ReadAsArray()
+
+                y = np.array(mask_array).astype('float32').reshape(512, 512, 1)
+
+                y_stack = []
+                # for zed in range(x_stack.shape[0]):
+                #     y_stack.append(y.reshape(512, 512, 1))
+
+                y_stack = np.array(y_stack)
+                # y_stack = np.array(y_stack).reshape(512, 512, 1)
+                # print(x_stack.shape, "\t", y.shape)
+                yield (x_stack, y)
+                # for zed in range(len(x_stack)):
+                #     yield(x_stack[zed], y_stack[zed].reshape(512, 512, 1))
+                # yield (x_stack, y_stack)
+
+def validate_image(path: str, dir: str, image: str) -> bool:
+    try:
+        with gdal_open(os.path.join(path, dir, image)) as f:
+            tile_vv_array = f.ReadAsArray()
+    except FileNotFoundError:
+        return False
+    try:
+        with gdal_open(os.path.join(path, dir, image.replace('VV', 'VH'))):
+            tile_vh_array = f.ReadAsArray()
+    except FileNotFoundError:
+        return False
+    # if not edit:
+    tile_array = np.stack((tile_vh_array, tile_vv_array), axis=2)
+    if not valid_image(tile_array):
+        return False
+    
+    return True
+
+def validate_mask(mask: str) -> bool:
+    try:
+        with gdal_open(mask) as f:
+            tile_vv_array = f.ReadAsArray()
+    except FileNotFoundError:
+        return False
+    
+    return True

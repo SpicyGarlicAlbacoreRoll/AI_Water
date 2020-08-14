@@ -18,6 +18,7 @@ from ..asf_typing import History
 
 class ModelType(Enum):
     MASKED = 1
+    CROP_CLASSIFIER = 2
 
 
 class Encoder(json.JSONEncoder):
@@ -77,7 +78,7 @@ def save_model(
     if history:
         save_history_to_path(history, model_dir)
 
-    model.save(model_path)
+    model.save(model_path, include_optimizer=False)
 
 
 def load_model(model_name: str) -> Model:
@@ -124,5 +125,8 @@ def load_history_from_path(model_dir: str) -> History:
 
 
 def model_type(model: Model, dem=NETWORK_DEMS) -> Optional[ModelType]:
-    if model.output_shape == (None, dem, dem, 1):
-        return ModelType.MASKED
+    # if model.output_shape == (None, dem, dem, 1):
+    #     return ModelType.MASKED
+    # # if model.output_shape == (None, 5, dem, dem, 3):
+    # else:
+    return ModelType.CROP_CLASSIFIER

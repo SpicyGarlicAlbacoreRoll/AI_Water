@@ -9,13 +9,18 @@ For more information see README.md
 """
 
 import os
+import json
+from datetime import date, datetime 
 from argparse import ArgumentParser, Namespace
 
-from src.asf_cnn import test_model_masked, train_model
+from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
 from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
-from src.plots import edit_predictions, plot_predictions
+from PIL import Image 
+# from src.plots import edit_predictions, plot_predictions
 
+from src.model.architecture.crop_masked import create_cdl_model_masked
+from keras.preprocessing.image import array_to_img
 
 def train_wrapper(args: Namespace) -> None:
     """ Function for training a network. """
@@ -29,8 +34,9 @@ def train_wrapper(args: Namespace) -> None:
             print(f"File {model_name} already exists!")
             return
 
-        model = create_model_masked(model_name)
-        history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": []}
+        # model = create_model_masked(model_name)
+        model = create_cdl_model_masked(model_name)
+        history = {"loss": [], "sparse_categorical_accuracy": [], "val_loss": [], "val_sparse_categorical_accuracy": []}
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -39,20 +45,84 @@ def test_wrapper(args: Namespace) -> None:
     model_name = args.model
     model = load_model(model_name)
 
-    if args.edit:
-        predictions, data_iter, metadata = test_model_masked(
-            model, args.dataset, args.edit
-        )
-        edit_predictions(
-            predictions, data_iter, metadata
-        )
-    else:
-        predictions, test_iter = test_model_masked(
-            model, args.dataset, args.edit
-        )
-        plot_predictions(
-            predictions, test_iter
-        )
+    # if args.edit:
+    #     predictions, data_iter, metadata = test_model_masked(
+    #         model, args.dataset, args.edit
+    #     )
+    #     edit_predictions(
+    #         predictions, data_iter, metadata
+    #     )
+    # else:
+    predictions, test_batch_metadata = test_model_timeseries(
+        model, args.dataset, args.edit
+    )
+
+    model_batch_size = len(test_batch_metadata[0])
+    current_date_time = str(datetime.utcnow())
+
+    # Version number _ Country _ Region
+    model_name_metadata = model_name.split("_")
+    
+    metadata = {"model_test_info": {"name": model_name, "model_architecture_version": model_name_metadata[0], "dataset": args.dataset, "batch_size": model_batch_size, "UTC_date_time": current_date_time}}
+
+    prediction_directory_name = "{0}_{1}_{2}".format(model_name, args.dataset, current_date_time)
+
+    os.mkdir("predictions/{0}".format(prediction_directory_name))
+
+    # for batches
+    for idx, batch in enumerate(test_batch_metadata):
+        # print(len(batch))
+        metadata["batch_{0}".format(idx)] = []
+        samples = []
+        # for sample in batch
+        for idy, sample in enumerate(batch):
+            # print(len(sample))
+            timeseries_mask_pair = {}
+            # for timestep in sample
+            sample_timesteps = []
+            for vv, vh in sample[0]:
+                
+                # for vh, vv in timeseries:
+                vh_vv_pair = {"vh": vh, "vv": vv}
+                sample_timesteps.append(vh_vv_pair)
+            
+            timeseries_mask_pair["mask"] = sample[1]
+            timeseries_mask_pair["timesteps"] = sample_timesteps
+            # The name of the prediction produced by this sample
+
+            # prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
+            prediction_file_name="predictions/{0}/batch_{1}".format(prediction_directory_name, idx, idy)
+            sample_data = {"sample_{0}".format(idy): timeseries_mask_pair, "prediction": prediction_file_name}
+            samples.append(sample_data)
+
+        metadata["batch_{0}".format(idx)].append(samples)
+
+
+
+    with open('predictions/{0}/{1}_{2}_batch_metadata_{3}.json'.format(prediction_directory_name, model_name, args.dataset, current_date_time), 'w') as fp:
+        json.dump(metadata, fp, indent=4)
+
+    print("samples:" + str(len(predictions * model_batch_size)))
+
+    for idx in range(len(test_batch_metadata)):
+        os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, idx))
+    # set to -1 to account for 0 mod 4 = 0 in batch_indexing
+    
+    batch_index = 0
+    for idy, image in enumerate(predictions):
+        if idy % model_batch_size == 0 and idy != 0:        
+            batch_index += 1
+
+        img_0 = array_to_img(image[0,:,:,0].reshape(512, 512, 1))
+        img_1 = array_to_img(image[0,:,:,1].reshape(512, 512, 1))
+        filename_0 = "predictions/{0}/batch_{1}/sample_{2}_class_0.tif".format(prediction_directory_name, batch_index, idy)
+        filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
+        img_0.save(filename_0)
+        img_1.save(filename_1)
+                
+    # plot_predictions(
+    #     predictions, test_iter
+    # )
 
 
 if __name__ == '__main__':
