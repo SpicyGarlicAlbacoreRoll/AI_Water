@@ -156,7 +156,7 @@ def create_cdl_model_masked(
     #V1.1.2
     # outputs = TimeDistributed(Conv2D(2, 1, activation='softmax', name='last_layer'))(c13)
 
-    #V1.1.3
+    #V1.1.5
     lstm_layer_0 = ConvLSTM2D(2, (1, 1), return_sequences=True)(c13)
     normalized = BatchNormalization()(lstm_layer_0)
     lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer',  activation='softmax')(normalized)

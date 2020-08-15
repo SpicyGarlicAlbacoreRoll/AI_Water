@@ -7,7 +7,9 @@ from typing import Optional, List, Tuple
 import keras
 
 class SARTimeseriesGenerator(keras.utils.Sequence):
-    def __init__(self, time_series_mask_list, batch_size=32, dim=(512, 512), time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, n_classes=3, shuffle=True, clip_range: Optional[Tuple[float, float]] = None):
+    def __init__(self, time_series_mask_list, batch_size=32, dim=(512, 512), 
+    time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, 
+    n_classes=3, shuffle=True, clip_range: Optional[Tuple[float, float]] = None):
         self.list_IDs = time_series_mask_list
         # self.masks = masks
 

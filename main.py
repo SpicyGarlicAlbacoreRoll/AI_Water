@@ -21,6 +21,7 @@ from PIL import Image
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
 from keras.preprocessing.image import array_to_img
+import numpy as np
 
 def train_wrapper(args: Namespace) -> None:
     """ Function for training a network. """
@@ -113,8 +114,8 @@ def test_wrapper(args: Namespace) -> None:
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
 
-        img_0 = array_to_img(image[0,:,:,0].reshape(512, 512, 1))
-        img_1 = array_to_img(image[0,:,:,1].reshape(512, 512, 1))
+        img_0 = array_to_img(np.array(image[0,:,:,0].reshape(512, 512, 1)).astype(dtype=np.uint8))
+        img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
         filename_0 = "predictions/{0}/batch_{1}/sample_{2}_class_0.tif".format(prediction_directory_name, batch_index, idy)
         filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
         img_0.save(filename_0)
