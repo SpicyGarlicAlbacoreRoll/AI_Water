@@ -37,7 +37,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "sparse_categorical_accuracy": [], "val_loss": [], "val_sparse_categorical_accuracy": []}
+        history = {"loss": [], "accuracy": [], "sparse_categorical_accuracy": [], "val_loss": [], "val_accuracy": [], "val_sparse_categorical_accuracy": [], }
 
     train_model(model, history, args.dataset, args.epochs)
 

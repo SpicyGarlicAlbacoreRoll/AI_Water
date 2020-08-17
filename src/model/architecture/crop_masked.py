@@ -22,13 +22,12 @@ def conv2d_block_time_dist(
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
     # first layer
-    x = TimeDistributed(
-        Conv2D(
+    x = ConvLSTM2D(
             filters=num_filters,
             kernel_size=(kernel_size, kernel_size),
             kernel_initializer='he_normal',
-            padding='same'
-        )
+            padding='same',
+            return_sequences=True,
     )(input_tensor)
     # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
 
@@ -36,13 +35,12 @@ def conv2d_block_time_dist(
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
     # second layer
-    x = TimeDistributed(
-        Conv2D(
+    x = ConvLSTM2D(
             filters=num_filters,
             kernel_size=(kernel_size, kernel_size),
             kernel_initializer='he_normal',
-            padding='same'
-        )
+            padding='same',
+            return_sequences=True,
     )(input_tensor)
 
     # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
@@ -58,7 +56,7 @@ def conv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 16,
+    num_filters: int = 20,
     time_steps: int = 5,
     dropout: float = 0.1,
     batchnorm: bool = True
@@ -82,57 +80,20 @@ def create_cdl_model_masked(
     p3 =TimeDistributed( MaxPooling2D((2, 2)))(c3)
     p3 = TimeDistributed(Dropout(dropout))(p3)
 
-    c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
-    p4 = TimeDistributed(Dropout(dropout))(p4)
-
-    c5 = conv2d_block_time_dist(p4, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    p5 = TimeDistributed(MaxPooling2D((2, 2)))(c5)
-    p5 = TimeDistributed(Dropout(dropout))(p5)
-
-    c6 = conv2d_block_time_dist(
-        p5, num_filters * 8, kernel_size=3, batchnorm=batchnorm
-    )
-    p6 = TimeDistributed(MaxPooling2D((2, 2)))(c6)
-    p6 = TimeDistributed(Dropout(dropout))(p6)
-
     c7 = conv2d_block_time_dist(
-        p6, num_filters=num_filters * 16, kernel_size=3, batchnorm=batchnorm
+        p3, num_filters=num_filters * 8, kernel_size=3, batchnorm=batchnorm
     )
 
-    # Expanding to 64 x 64 x 1
-    u8 = TimeDistributed(Conv2DTranspose(
-        num_filters * 4, (3, 3), strides=(2, 2), padding='same'
-    ))(c7)
-    u8 = concatenate([u8, c6])
-    u8 = TimeDistributed(Dropout(dropout))(u8)
-    c8 = conv2d_block_time_dist(u8, num_filters * 4, kernel_size=3, batchnorm=batchnorm)
 
-    u9 = TimeDistributed(Conv2DTranspose(
-        num_filters * 2, (3, 3), strides=(2, 2), padding='same'
-    ))(c8)
-    u9 = concatenate([u9, c5])
-    u9 = TimeDistributed(Dropout(dropout))(u9)
-    c9 = conv2d_block_time_dist(u9, num_filters * 2, kernel_size=3, batchnorm=batchnorm)
-
-    u10 = TimeDistributed(Conv2DTranspose(
-        num_filters * 1, (3, 3), strides=(2, 2), padding='same'
-    ))(c9)
-
-    u10 = concatenate([u10, c4])
-    u10 = TimeDistributed(Dropout(dropout))(u10)
-    c10 = conv2d_block_time_dist(
-        u10, num_filters * 1, kernel_size=3, batchnorm=batchnorm
-    )
 
     u11 = TimeDistributed(Conv2DTranspose(
-        num_filters * 1, (3, 3), strides=(2, 2), padding='same'
-    ))(c10)
+        num_filters * 4, (3, 3), strides=(2, 2), padding='same'
+    ))(c7)
 
     u11 = concatenate([u11, c3])
     u11 = TimeDistributed(Dropout(dropout))(u11)
     c11 = conv2d_block_time_dist(
-        u11, num_filters * 1, kernel_size=3, batchnorm=batchnorm
+        u11, num_filters * 2, kernel_size=3, batchnorm=batchnorm
     )
 
     u12 = TimeDistributed(Conv2DTranspose(
@@ -178,7 +139,7 @@ def create_cdl_model_masked(
     model.__asf_model_name = model_name
 
     model.compile(
-        loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=["sparse_categorical_accuracy"]
+        loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=["sparse_categorical_accuracy", "accuracy"]
     )
 
     return model
