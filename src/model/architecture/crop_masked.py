@@ -11,7 +11,7 @@ from keras.optimizers import Adam
 from keras.losses import BinaryCrossentropy
 from keras.metrics import MeanIoU
 from src.config import NETWORK_DEMS as dems
-
+from keras.losses import SparseCategoricalCrossentropy
 
 def conv2d_block_time_dist(
     input_tensor: Input,
@@ -24,9 +24,10 @@ def conv2d_block_time_dist(
     # first layer
     x = ConvLSTM2D(
             filters=num_filters,
-            kernel_size=(kernel_size, kernel_size),
+            kernel_size=kernel_size,
             kernel_initializer='he_normal',
             padding='same',
+            activation='relu', 
             return_sequences=True,
     )(input_tensor)
     # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
@@ -37,9 +38,10 @@ def conv2d_block_time_dist(
     # second layer
     x = ConvLSTM2D(
             filters=num_filters,
-            kernel_size=(kernel_size, kernel_size),
+            kernel_size=kernel_size,
             kernel_initializer='he_normal',
             padding='same',
+            activation='relu', 
             return_sequences=True,
     )(input_tensor)
 
@@ -56,7 +58,7 @@ def conv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 20,
+    num_filters: int = 16,
     time_steps: int = 5,
     dropout: float = 0.1,
     batchnorm: bool = True
@@ -120,9 +122,9 @@ def create_cdl_model_masked(
     #V1.1.5
     lstm_layer_0 = ConvLSTM2D(2, (1, 1), return_sequences=True)(c13)
     normalized = BatchNormalization()(lstm_layer_0)
-    lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer',  activation='softmax')(normalized)
-    outputs = BatchNormalization()(lstm_layer_1)
-    outputs_reshaped = Reshape((1, dems, dems, 2))(outputs)
+    lstm_layer_1 = ConvLSTM2D(1, 1, name='last_layer', activation="sigmoid")(normalized)
+    # outputs = BatchNormalization()(lstm_layer_1)
+    outputs_reshaped = Reshape((1, dems, dems, 1))(lstm_layer_1)
     
     # output = Conv3D( filters=1, kernel_size=(3, 3, 3), activation="sigmoid", padding="same")(outputs)
     # normalized_output = BatchNormalization()(outputs)
@@ -137,9 +139,9 @@ def create_cdl_model_masked(
     model = Model(inputs=inputs, outputs=[outputs_reshaped])
 
     model.__asf_model_name = model_name
-
+    
     model.compile(
-        loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=["sparse_categorical_accuracy", "accuracy"]
+        loss='mean_squared_error', optimizer=Adam(), metrics=["accuracy"]
     )
 
     return model

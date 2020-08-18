@@ -37,7 +37,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "accuracy": [], "sparse_categorical_accuracy": [], "val_loss": [], "val_accuracy": [], "val_sparse_categorical_accuracy": [], }
+        history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": [], }
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -115,11 +115,11 @@ def test_wrapper(args: Namespace) -> None:
             batch_index += 1
 
         img_0 = array_to_img(np.array(image[0,:,:,0].reshape(512, 512, 1)).astype(dtype=np.uint8))
-        img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
+        # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
         filename_0 = "predictions/{0}/batch_{1}/sample_{2}_class_0.tif".format(prediction_directory_name, batch_index, idy)
-        filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
+        # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
         img_0.save(filename_0)
-        img_1.save(filename_1)
+        # img_1.save(filename_1)
                 
     # plot_predictions(
     #     predictions, test_iter

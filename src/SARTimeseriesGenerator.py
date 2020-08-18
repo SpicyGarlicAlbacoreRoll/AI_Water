@@ -5,6 +5,7 @@ import numpy as np
 from src.gdal_wrapper import gdal_open
 from typing import Optional, List, Tuple
 import keras
+from tensorflow import convert_to_tensor
 
 class SARTimeseriesGenerator(keras.utils.Sequence):
     def __init__(self, time_series_mask_list, batch_size=32, dim=(512, 512), 
@@ -100,13 +101,13 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                     mask = f.ReadAsArray()
                 
                 # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
-                mask_array = np.array(mask).astype('uint8').reshape(512, 512, 1)
+                mask_array = np.array(mask).astype('bool').reshape(512, 512, 1)
 
                 X[sample_idx,] = x_stack
                 y[sample_idx,] = mask_array
         
         # return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
-        return np.nan_to_num(X, nan=0, copy=False), np.nan_to_num(y, nan=0, copy=False)
+        return convert_to_tensor(np.nan_to_num(X, nan=0, copy=False)), convert_to_tensor(np.nan_to_num(y, nan=0, copy=False))
 
 
     # Non-keras.utils.Sequence functions
