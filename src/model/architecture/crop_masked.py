@@ -2,7 +2,7 @@
     Contains the architecture for creating a cropland data layer within SAR images.
 """
 from tensorflow.python.framework.ops import disable_eager_execution
-from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D, Reshape, AveragePooling3D, Conv3D
+from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D, Reshape, GlobalAveragePooling3D, AveragePooling3D, Conv3D
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.merge import concatenate
 from keras.layers.pooling import MaxPooling2D
@@ -22,28 +22,40 @@ def conv2d_block_time_dist(
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
     # first layer
-    x = ConvLSTM2D(
-            filters=num_filters,
-            kernel_size=kernel_size,
-            kernel_initializer='he_normal',
-            padding='same',
-            activation='relu', 
-            return_sequences=True,
-    )(input_tensor)
+    # x = ConvLSTM2D(
+    #         filters=num_filters,
+    #         kernel_size=kernel_size,
+    #         kernel_initializer='he_normal',
+    #         padding='same',
+    #         activation='relu', 
+    #         return_sequences=True,
+    # )(input_tensor)
+    x = TimeDistributed(Conv2D(
+        filters=num_filters,
+        kernel_size=kernel_size,
+        kernel_initializer='he_normal',
+        padding='same',
+    ))(input_tensor)
     # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
 
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
     # second layer
-    x = ConvLSTM2D(
+    # x = ConvLSTM2D(
+    #         filters=num_filters,
+    #         kernel_size=kernel_size,
+    #         kernel_initializer='he_normal',
+    #         padding='same',
+    #         activation='relu', 
+    #         return_sequences=True,
+    # )(input_tensor)
+    x = TimeDistributed(Conv2D(
             filters=num_filters,
             kernel_size=kernel_size,
             kernel_initializer='he_normal',
             padding='same',
-            activation='relu', 
-            return_sequences=True,
-    )(input_tensor)
+    ))(x)
 
     # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
     if batchnorm:
@@ -92,7 +104,7 @@ def create_cdl_model_masked(
         num_filters * 4, (3, 3), strides=(2, 2), padding='same'
     ))(c7)
 
-    u11 = concatenate([u11, c3])
+    u11 = concatenate([u11, c3], axis=4)
     u11 = TimeDistributed(Dropout(dropout))(u11)
     c11 = conv2d_block_time_dist(
         u11, num_filters * 2, kernel_size=3, batchnorm=batchnorm
@@ -101,7 +113,7 @@ def create_cdl_model_masked(
     u12 = TimeDistributed(Conv2DTranspose(
         num_filters * 1, (3, 3), strides=(2, 2), padding='same'
     ))(c11)
-    u12 = concatenate([u12, c2])
+    u12 = concatenate([u12, c2], axis=4)
     u12 = TimeDistributed(Dropout(dropout))(u12)
     c12 = conv2d_block_time_dist(
         u12, num_filters * 1, kernel_size=3, batchnorm=batchnorm
@@ -110,7 +122,7 @@ def create_cdl_model_masked(
     u13 = TimeDistributed(Conv2DTranspose(
         num_filters * 1, (3, 3), strides=(2, 2), padding='same'
     ))(c12)
-    u13 = concatenate([u13, c1])
+    u13 = concatenate([u13, c1], axis=4)
     u13 = TimeDistributed(Dropout(dropout))(u13)
     c13 = conv2d_block_time_dist(
         u13, num_filters * 1, kernel_size=3, batchnorm=batchnorm
@@ -120,12 +132,17 @@ def create_cdl_model_masked(
     # outputs = TimeDistributed(Conv2D(2, 1, activation='softmax', name='last_layer'))(c13)
 
     #V1.1.5
-    lstm_layer_0 = ConvLSTM2D(2, (1, 1), return_sequences=True)(c13)
+    lstm_layer_0 = ConvLSTM2D(2, 1, return_sequences=True)(c13)
     normalized = BatchNormalization()(lstm_layer_0)
-    lstm_layer_1 = ConvLSTM2D(1, 1, name='last_layer', activation="sigmoid")(normalized)
+    lstm_layer_1 = ConvLSTM2D(2, 1, name='last_layer', return_sequences=True)(normalized)
+    # pooled = GlobalAveragePooling3D()(lstm_layer_1)
+    # pooled = Reshape((dems,dems, 1))(pooled)
     # outputs = BatchNormalization()(lstm_layer_1)
-    outputs_reshaped = Reshape((1, dems, dems, 1))(lstm_layer_1)
-    
+    # outputs_reshaped = Reshape((dems, -1, 1))(lstm_layer_1)
+    final = TimeDistributed(Conv2D(2, 1))(lstm_layer_1)
+    final = TimeDistributed(Conv2D(2, 1))(final)
+    final = ConvLSTM2D(2, 1,activation="sigmoid", return_sequences=False)(final)
+    # final = Reshape((510, 510, 1))(final)
     # output = Conv3D( filters=1, kernel_size=(3, 3, 3), activation="sigmoid", padding="same")(outputs)
     # normalized_output = BatchNormalization()(outputs)
     # # averaged = AveragePooling3D()
@@ -136,12 +153,12 @@ def create_cdl_model_masked(
     # lstm = LSTM(2)(outputs)
     # final = Dense(1, activation='sigmoid')(lstm)
 
-    model = Model(inputs=inputs, outputs=[outputs_reshaped])
+    model = Model(inputs=inputs, outputs=[final])
 
     model.__asf_model_name = model_name
     
     model.compile(
-        loss='mean_squared_error', optimizer=Adam(), metrics=["accuracy"]
+        loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=["accuracy"]
     )
 
     return model

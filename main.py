@@ -114,12 +114,15 @@ def test_wrapper(args: Namespace) -> None:
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
 
-        img_0 = array_to_img(np.array(image[0,:,:,0].reshape(512, 512, 1)).astype(dtype=np.uint8))
-        # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-        filename_0 = "predictions/{0}/batch_{1}/sample_{2}_class_0.tif".format(prediction_directory_name, batch_index, idy)
-        # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_class_1.tif".format(prediction_directory_name, batch_index, idy)
-        img_0.save(filename_0)
-        # img_1.save(filename_1)
+        temp = np.array(image.reshape(-1, 512, 512, 1))
+        for idz, frame in enumerate(range(temp.shape[0])):
+            img_0 = array_to_img(temp[idz, :, :, 0].reshape(512, 512, 1).astype(dtype=np.float32))
+            # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
+            # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
+            filename_0 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_0.tif".format(prediction_directory_name, batch_index, idy, idz)
+            # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
+            img_0.save(filename_0)
+            # img_1.save(filename_1)
                 
     # plot_predictions(
     #     predictions, test_iter
