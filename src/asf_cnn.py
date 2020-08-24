@@ -60,6 +60,7 @@ def train_model(
             x=training_set,
             validation_data=validation_set,
             epochs=1,
+            workers=8,
             verbose=verbose)
 
         for key in model_history.keys():
