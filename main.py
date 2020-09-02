@@ -16,6 +16,7 @@ from argparse import ArgumentParser, Namespace
 from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
 from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
+from src.config import NETWORK_DEMS
 from PIL import Image 
 # from src.plots import edit_predictions, plot_predictions
 
@@ -114,9 +115,9 @@ def test_wrapper(args: Namespace) -> None:
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
 
-        temp = np.array(image.reshape(-1, 512, 512, 1))
+        temp = np.array(image.reshape(-1, NETWORK_DEMS, NETWORK_DEMS, 1))
         for idz, frame in enumerate(range(temp.shape[0])):
-            img_0 = array_to_img(temp[idz, :, :, 0].reshape(512, 512, 1).astype(dtype=np.float32))
+            img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.float32))
             # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
             # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
             filename_0 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_0.tif".format(prediction_directory_name, batch_index, idy, idz)

@@ -4,11 +4,12 @@ the prepared data set for use.
 """
 
 import os
+import json
 import tensorflow as tf
 from math import floor
 import re
 from math import floor
-from typing import Generator, Optional, Tuple
+from typing import Generator, Optional, Tuple, Dict, List
 from random import Random
 
 import numpy as np
@@ -29,59 +30,88 @@ TITLE_TIME_SERIES_REGEX = re.compile(r"(.*)\_VH(.*)\.(tiff|tif|TIFF|TIF)")
 
 def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
 
-    train_metadata, test_metadata = make_timeseries_metadata(dataset)
+    # train_metadata, test_metadata = make_timeseries_metadata(dataset)
+    time_steps=0
+    sample_size=0
+    train_metadata = find_timeseries_metadata(dataset, training=True)
+    sub_datasets = list(train_metadata)
+    frame_keys = []
+    for sub_dataset in sub_datasets:
+        subset_sample_size = 0
+        for key in list(train_metadata[sub_dataset]):
+            time_steps = int(max(len(train_metadata[sub_dataset][key]) / 2, time_steps))
+            subset_sample_size+=len(train_metadata[sub_dataset][key])
+            frame_keys.append((sub_dataset, key))
+        
+        print(f"Subset Sample {sub_dataset} Size: {subset_sample_size} files")
+        sample_size+= subset_sample_size
+            
 
+    sample_size = len(frame_keys)
     print("\n# of datasets:\t", len(train_metadata))
-    flattened_list = []
+    # flattened_list = []
 
-    for subset in train_metadata:
-        for time_series_mask_pair in subset:
-            flattened_list.append(time_series_mask_pair)
+    # for subset in train_metadata:
+    #     for time_series_mask_pair in subset:
+    #         flattened_list.append(time_series_mask_pair)
 
-    sample_size = len(flattened_list)
-    time_steps = max(len(x[0]) for x in flattened_list)
+    # sample_size = len(flattened_list)
+    # time_steps = max(len(x[0]) for x in flattened_list)
     # time_steps = len(flattened_list[0][0])
-    print("\tCombined Sample Size:\t", sample_size)
-    print("\tMax Time Steps:\t", time_steps)
+    print(f"\tCombined Sample Size:\t {sample_size} files")
+    print(f"\tMax Time Steps:\t {time_steps}")
     print("\n")
 
-    # pre-allocate for inserting by index
-    # x_train = np.empty((sample_size, time_steps, NETWORK_DEMS, NETWORK_DEMS, 2))
-    # y_train = np.empty((sample_size, 1, NETWORK_DEMS, NETWORK_DEMS, 1))
-
-    # for idx, (time_stack, mask) in enumerate(generate_timeseries_from_metadata(train_metadata, clip_range=(0, 2))):
-    #     x_train[idx, :] = time_stack
-    #     y_train[idx, :] = mask
-
-    # print("\nX data shape:\t", x_train.shape)
-    # print("Y data shape:\t", y_train.shape)
-
     # shuffle our data for validation split
-    Random(64).shuffle(flattened_list)
-
-    validation_split = .25
+    Random(64).shuffle(frame_keys)
+    # print(frame_keys)
+    validation_split = .1
     split_index = floor(sample_size * validation_split)
     train_iter = SARTimeseriesGenerator(
-        flattened_list[:-split_index],
-        batch_size=2,
+        train_metadata, 
+        time_series_frames=frame_keys[:-split_index],
+        batch_size=32,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
         n_classes=2,
+        dataset_directory=dataset_dir(dataset),
         shuffle=True)
     validation_iter = SARTimeseriesGenerator(
-        flattened_list[-split_index:],
-        batch_size=2,
+        train_metadata,
+        time_series_frames=frame_keys[-split_index:],
+        batch_size=32,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
         n_classes=2,
+        dataset_directory=dataset_dir(dataset),
         shuffle=True)
     return train_iter, validation_iter
+
+def find_timeseries_metadata(dataset: str, training: bool = False) -> List[Dict]:
+    files = os.listdir(dataset_dir(dataset))
+    metadata = {}
+
+    for file in files:
+        if file.endswith('.json'):
+            with open(os.path.join(dataset_dir(dataset), file)) as json_file:
+                f = json.load(json_file)
+
+                key = file.split(".")[0]
+
+                if training:
+                    metadata[key] = f.get("train")
+                else:
+                    metadata[key] = f.get("test")
+    
+    keys = metadata.keys()
+    print(keys)
+    return metadata
 
 def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata, Iterator]:
     train_metadata, test_metadata = make_timeseries_metadata(dataset, training=False)
@@ -103,7 +133,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata
     
     test_iter = SARTimeseriesGenerator(
         flattened_list,
-        batch_size=2,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -307,7 +337,7 @@ def generate_timeseries_from_metadata(
                 with gdal_open(mask) as f:
                     mask_array = f.ReadAsArray()
 
-                y = np.array(mask_array).astype('float32').reshape(512, 512, 1)
+                y = np.array(mask_array).astype('float32').reshape(NETWORK_DEMS, NETWORK_DEMS, 1)
 
                 y_stack = []
                 # for zed in range(x_stack.shape[0]):
