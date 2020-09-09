@@ -8,7 +8,6 @@ import json
 import tensorflow as tf
 from math import floor
 import re
-from math import floor
 from typing import Generator, Optional, Tuple, Dict, List
 from random import Random
 
@@ -33,44 +32,62 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     # train_metadata, test_metadata = make_timeseries_metadata(dataset)
     time_steps=0
     sample_size=0
+    # if os.path.isfile(os.path.join(dataset_dir(dataset), f"{dataset}.json")):
+    #     x = 3
     train_metadata = find_timeseries_metadata(dataset, training=True)
-    sub_datasets = list(train_metadata)
-    frame_keys = []
-    for sub_dataset in sub_datasets:
-        subset_sample_size = 0
-        for key in list(train_metadata[sub_dataset]):
-            time_steps = int(max(len(train_metadata[sub_dataset][key]) / 2, time_steps))
-            subset_sample_size+=len(train_metadata[sub_dataset][key])
-            frame_keys.append((sub_dataset, key))
+    frame_keys, sample_size, time_steps = generate_frame_keys(train_metadata, dataset)
+
+    # sub_datasets = list(train_metadata)
+    # frame_keys = []
+    # for sub_dataset in sub_datasets:
+    #     subset_sample_size = 0
+    #     valid_files = []
+    #     number_valid_files = 0
+    #     for key in list(train_metadata[sub_dataset]):
+
+    #         # valid_files = [x for x in range(len(train_metadata[sub_dataset][key]))]
+
+    #         if len(train_metadata[sub_dataset][key]) != 0:
+    #             for file in train_metadata[sub_dataset][key]:
+    #                 number_valid_files += 1
+    #             time_steps = int(max(len(train_metadata[sub_dataset][key]) / 2, time_steps))
+    #             subset_sample_size += len(train_metadata[sub_dataset][key])
+    #             # if subset_sample_size != 0:
+    #             frame_keys.append((sub_dataset, key))
         
-        print(f"Subset Sample {sub_dataset} Size: {subset_sample_size} files")
-        sample_size+= subset_sample_size
+    #     print(f"Subset Sample {sub_dataset} Size: {subset_sample_size} timeseries samples")
+    #     sample_size+= subset_sample_size
             
 
-    sample_size = len(frame_keys)
-    print("\n# of datasets:\t", len(train_metadata))
-    # flattened_list = []
+    # sample_size = len(frame_keys)
+    # print("\n# of datasets:\t", len(train_metadata))
+    # # flattened_list = []
 
-    # for subset in train_metadata:
-    #     for time_series_mask_pair in subset:
-    #         flattened_list.append(time_series_mask_pair)
+    # # for subset in train_metadata:
+    # #     for time_series_mask_pair in subset:
+    # #         flattened_list.append(time_series_mask_pair)
 
-    # sample_size = len(flattened_list)
-    # time_steps = max(len(x[0]) for x in flattened_list)
-    # time_steps = len(flattened_list[0][0])
-    print(f"\tCombined Sample Size:\t {sample_size} files")
-    print(f"\tMax Time Steps:\t {time_steps}")
-    print("\n")
+    # # sample_size = len(flattened_list)
+    # # time_steps = max(len(x[0]) for x in flattened_list)
+    # # time_steps = len(flattened_list[0][0])
+    # print(f"\tCombined Sample Size:\t {sample_size} files")
+    # print(f"\tMax Time Steps:\t {time_steps}")
+    # print("\n")
 
     # shuffle our data for validation split
     Random(64).shuffle(frame_keys)
     # print(frame_keys)
-    validation_split = .1
+    validation_split = 0.1
     split_index = floor(sample_size * validation_split)
+    print("\n")
+    print(f"validation Split:\t{validation_split * 100}%")
+    print(f"Training Samples:\t{sample_size-split_index}")
+    print(f"Validation Samples:\t{split_index}\n")
+
     train_iter = SARTimeseriesGenerator(
         train_metadata, 
         time_series_frames=frame_keys[:-split_index],
-        batch_size=32,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -82,7 +99,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[Iterator]:
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
         time_series_frames=frame_keys[-split_index:],
-        batch_size=32,
+        batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
@@ -97,9 +114,13 @@ def find_timeseries_metadata(dataset: str, training: bool = False) -> List[Dict]
     files = os.listdir(dataset_dir(dataset))
     metadata = {}
 
+    # if f"dataset"
+    print("Found metadata files:")
     for file in files:
+        
         if file.endswith('.json'):
             with open(os.path.join(dataset_dir(dataset), file)) as json_file:
+                print(f"\t{file}")
                 f = json.load(json_file)
 
                 key = file.split(".")[0]
@@ -108,37 +129,56 @@ def find_timeseries_metadata(dataset: str, training: bool = False) -> List[Dict]
                     metadata[key] = f.get("train")
                 else:
                     metadata[key] = f.get("test")
-    
-    keys = metadata.keys()
-    print(keys)
+
     return metadata
 
+def generate_frame_keys(metadata: Dict, dataset):
+    frame_keys = []
+    time_steps=0
+    sample_size=0
+    total_files=0
+    sub_datasets = list(metadata)
+    for sub_dataset in sub_datasets:
+        subset_sample_size = 0
+        subset_file_count = 0
+        for key in list(metadata[sub_dataset]):
+            valid_files = []
+            # valid_files = [x for x in range(len(train_metadata[sub_dataset][key]))]
+
+            if len(metadata[sub_dataset][key]) != 0:
+
+                time_steps = int(max(len(metadata[sub_dataset][key]) / 2, time_steps))
+                subset_file_count += len(metadata[sub_dataset][key])
+                subset_sample_size += 1
+                frame_keys.append((sub_dataset, key))
+        
+        print(f"\nSubset Sample {sub_dataset} Size: {subset_sample_size} samples")
+        print(f"\tsubset file count: {subset_file_count}")
+        total_files+=subset_file_count
+            
+
+    sample_size = len(frame_keys)
+    print("\n# of datasets:\t", len(metadata))
+    print(f"\tTotal Files:\t{total_files}")
+    print(f"\tCombined Sample Size:\t{sample_size} time series samples")
+    print(f"\tMax Time Steps:\t{time_steps}")
+
+    return frame_keys, sample_size, time_steps
+
 def load_test_timeseries_dataset(dataset: str) -> Tuple[MaskedTimeseriesMetadata, Iterator]:
-    train_metadata, test_metadata = make_timeseries_metadata(dataset, training=False)
+    test_metadata = find_timeseries_metadata(dataset, training=False)
+    frame_keys, sample_size, time_steps = generate_frame_keys(test_metadata, dataset)
 
-
-    print("\n# of datasets:\t", len(test_metadata))
-    flattened_list = []
-
-    for subset in test_metadata:
-        for time_series_mask_pair in subset:
-            flattened_list.append(time_series_mask_pair)
-
-    sample_size = len(flattened_list)
-    time_steps = max(len(x[0]) for x in flattened_list)
-    # time_steps = len(flattened_list[0][0])
-    print("\tCombined Sample Size:\t", sample_size)
-    print("\tMax Time Steps:\t", time_steps)
-    print("\n")
-    
     test_iter = SARTimeseriesGenerator(
-        flattened_list,
-        batch_size=1,
+        test_metadata,
+        time_series_frames=frame_keys,
+        batch_size=32,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
+        dataset_directory=dataset_dir(dataset),
         n_classes=2,
         shuffle=False)
     

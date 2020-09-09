@@ -1,5 +1,7 @@
 import random
 from random import Random
+from src.dataset.crop_masked import validate_image
+from tqdm import tqdm
 import os
 import re
 import json
@@ -39,12 +41,6 @@ def create_sample_split():
     state = input("Enter state acronym (IE: AK, WA, OR):\t")
     year = input("Enter year (IE 2017, 2020, 2019):\t")
 
-    # for file in os.listdir(f"{os.getcwd()}/prep_tiles"):
-    #     if file.split("_")[0] == 'CDL' and file.endswith("mask.tif"):
-    #         # example: CDL_WA_2018_mask.tif
-    #         state = file.split("_")[1]
-    #         year = file.split("_")[2]
-    #         break
     dir = f'{state}_{year}'
     print (dir)
 
@@ -65,7 +61,7 @@ def create_sample_split():
     files = [
         file 
             for file in 
-                os.listdir(f"{os.getcwd()}/prep_tiles/train") 
+                os.listdir(f"{os.getcwd()}/prep_tiles/tiles") 
                 if os.path.basename(file).startswith("S")
     ]
     # for file in os.listdir(f"{os.getcwd()}/prep_tiles/train"):
@@ -84,45 +80,50 @@ def create_sample_split():
     print("Splitting test/training data...")
     frame_names = [x for x in frame_names if x not in test_data_frame_names]
     print(f"{len(test_data_frame_names)} / {len(frame_names)} = {len(test_data_frame_names) / len(frame_names)}")
-    print("Moving data...")
-
+    print("Validating and moving data for...")
+    print("Test data")
     updated_frames = {}
     updated_frames["test"] = {}
     updated_frames["train"] = {}
     prep_tiles_path = os.path.join(os.getcwd(), "prep_tiles/")
-    for test_frame_name in test_data_frame_names:
+    for test_frame_name in tqdm(test_data_frame_names):
         updated_frames["test"][test_frame_name] = []
         for vv, vh in frames[test_frame_name]:
-            if not os.path.isfile(os.path.join(prep_tiles_path,"train/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"train/", vh)):
+            if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
                 continue
-            
+            if not validate_image(prep_tiles_path, "tiles/", vv):
+                continue
             # vv_file_name = Path(vv).name
             # vh_file_name = Path(vh).name
 
-            shutil.move(os.path.join(prep_tiles_path, "train/", vv), f"{dir_path}/test/{dir}")
+            shutil.move(os.path.join(prep_tiles_path, "tiles/", vv), f"{dir_path}/test/{dir}")
             vv = f"test/{dir}/{vv}"
             updated_frames["test"][test_frame_name].append(vv)
 
-            shutil.move(os.path.join(prep_tiles_path, "train/", vh), f"{dir_path}/test/{dir}")
+            shutil.move(os.path.join(prep_tiles_path, "tiles/", vh), f"{dir_path}/test/{dir}")
             vh = f"test/{dir}/{vh}"
             updated_frames["test"][test_frame_name].append(vh)
 
-    print("Test split data finished")
-    
-    for frame_name in frame_names:
+    print("Train data")
+    for frame_name in tqdm(frame_names):
         updated_frames["train"][frame_name] = []
         for vv, vh in frames[frame_name]:
-            if not os.path.isfile(os.path.join(prep_tiles_path,"train/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"train/", vh)):
+            if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
                 continue
-            vv_file_name = Path(vv).name
-            vh_file_name = Path(vh).name
+            if not validate_image(prep_tiles_path, "tiles/", vv):
+                continue
+
+            # vv_file_name = Path(vv).name
+            # vh_file_name = Path(vh).name
             
-            shutil.move(os.path.join(prep_tiles_path,"train/",vv), f"{dir_path}/train/{dir}")
-            vv = f"train/{dir}/{vv_file_name}"
+            shutil.move(os.path.join(prep_tiles_path,"tiles/",vv), f"{dir_path}/train/{dir}")
+            # vv = f"train/{dir}/{vv_file_name}"
+            vv = f"train/{dir}/{vv}"
             updated_frames["train"][frame_name].append(vv)
 
-            shutil.move(os.path.join(prep_tiles_path,"train/",vh), f"{dir_path}/train/{dir}")
-            vh = f"train/{dir}/{vh_file_name}"
+            shutil.move(os.path.join(prep_tiles_path,"tiles/",vh), f"{dir_path}/train/{dir}")
+            # vh = f"train/{dir}/{vh_file_name}"
+            vh = f"train/{dir}/{vh}"
             updated_frames["train"][frame_name].append(vh)
 
     print("Training data finished")
