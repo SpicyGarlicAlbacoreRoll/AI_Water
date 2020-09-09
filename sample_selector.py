@@ -37,7 +37,14 @@ def get_tiles(files: List) -> (Dict, List):
 
     return frames, frame_names
 
-def create_sample_split():
+"""Takes tiled data files frop prep_tiles/tiles/ and randomly splits the time series samples,
+90% going to training data and 10% going to testing data (depending on the tile size this might take a while). 
+This function will create (int the current working directory) a dataset folder with train and test folders 
+both containing a folder with the same name as the dataset. 
+
+A metadata file will also be created, and should be placed in the 
+root directory of a dataset using the subdataset created by this function."""
+def create_sample_split() -> None:
     state = input("Enter state acronym (IE: AK, WA, OR):\t")
     year = input("Enter year (IE 2017, 2020, 2019):\t")
 
@@ -64,12 +71,6 @@ def create_sample_split():
                 os.listdir(f"{os.getcwd()}/prep_tiles/tiles") 
                 if os.path.basename(file).startswith("S")
     ]
-    # for file in os.listdir(f"{os.getcwd()}/prep_tiles/train"):
-    #     files.append(f"{os.getcwd()}/prep_tiles/train/{file}")
-    # for file in os.listdir(f"{os.getcwd()}/prep_tiles/testing"):
-    #     files.append(f"{os.getcwd()}/prep_tiles/testing/{file}")
-
-    print(files[0])
 
     frames, frame_names = get_tiles(files)
 

@@ -1,0 +1,62 @@
+## Workflow:
+1. Find dataset in AI Cropland S3 data bucket
+
+### If dataset has tiled64 folder with zip file(s), 
+2. download the tiled64 folder with (from the root project directory)
+ -aws s3 cp "s3://path/to/dataset/tiled64/" ./ --recursive
+3. unzip contents and skip to step 12
+
+### If the dataset folder contains no tiled64 folder
+2. Download tif files in that dataset's folder with (from the root project directory)
+ -aws s3 cp "s3://path/to/dataset/" ./prep_tiles --recursive
+3. make two directories called "tiles" and "mask_tiles" in the prep_tiles directory
+3. Move prep_util.sh from the scripts/ to the root project directory
+4. Run the script with
+ -./prep_util.sh
+5. Wait for prep_utils to finish (This *will* take a while)
+6. Once prep_utils is finished, run
+ - python3 sample_selector.py
+7. Enter the dataset's State acronym (ie: AK, WA, OR)
+8. Enter the year of the dataset (2019, 2018, etc)
+9. Wait for sample_selector.py to finish (This will *also* take a while)
+10. There should be a directory for the dataset in the project root directory (ie: WA_2018, OR_2019, etc)
+11. Move all images in prep_tiles/mask_tiles to a 
+new directory in this dataset's directory called "[name_of_dataset]_masks" (IE: WA_2018_masks, OR_2019_masks)
+12. Copy this new masks directory into both the test and train folder in the dataset directory
+
+Repeat steps 1-12 for each dataset you wish to train with
+
+11. Make a directory in AI_Water/datasets/ for the region you wish to train with (ex: US_NW, US_SW)
+12. Make two directories in the new dataset directory called "test" and train"
+13. From each subdataset you have in the project root directory, copy the folders in test and train
+into their corresponding directories in your regional dataset. Also copy the json metadata file
+in each of the subdataset directories to the regional dataset's root directory
+
+## Your datasets directory should look something like this
+
+datasets/
+    |--US_NW/
+       |--WA_2018_metadata.json
+       |--OR_2019_metadata.json
+       |--test/
+       |   |--WA_2018/
+       |   |    |-- S1....VV_ulx_0_uly_0.tif
+       |   |    |-- S1....VH_ulx_0_uly_0.tif
+       |   |--OR_2019/
+       |   |--WA_2018_masks/
+       |   |    |-- CDL_WA_2018_mask_ulx_0_uly_0.tif
+       |   |--OR_2019_masks/
+       |--train/
+       |   |--WA_2018/
+       |   |    |-- S1....VV_ulx_64_uly_512.tif
+       |   |    |-- S1....VH_ulx_64_uly_512.tif
+       |   |--OR_2019/
+       |   |--WA_2018_masks/
+       |   |    |-- CDL_WA_2018_mask_ulx_64_uly_512.tif
+       |   |--OR_2019_masks/
+
+15. If all steps were performed properly, entering 
+- python3 main.py train name_of_new_model [name_of_regional_dataset]
+
+ex:
+- python3 main.py train cool_new_model US_NW
