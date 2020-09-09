@@ -219,7 +219,7 @@ def create_cdl_model_masked(
 
     # Adam(lr=1e-3)
     model.compile(
-        loss='binary_crossentropy', optimizer=Adam(learning_rate=1e-4), metrics=["accuracy"]
+        loss='binary_crossentropy', optimizer=Adam(learning_rate=1e-3), metrics=["accuracy"]
     )
 
     return model

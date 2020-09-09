@@ -1,22 +1,23 @@
 # Basic class organization based on Shervine Amidi's implementation,
 # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
 
-import numpy as np
 import os
-from src.gdal_wrapper import gdal_open
-from typing import Optional, List, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
+
 import keras
-from time import sleep
+import numpy as np
+from src.gdal_wrapper import gdal_open
 from tensorflow import convert_to_tensor
 
+from .asf_typing import TimeseriesMetadataFrameKey
+
+"""Takes metadata dictionary and list of timeseriesMetadataFrameKeys (dataset name, key) to access said sample."""
 class SARTimeseriesGenerator(keras.utils.Sequence):
-    def __init__(self, time_series_metadata, time_series_frames: List[Tuple], batch_size=32, dim=(512, 512), 
+    def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(512, 512), 
     time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, 
     n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True):
         self.list_IDs = time_series_metadata
         self.frame_data = time_series_frames
-        # print(self.list_frame_data)
-        # self.masks = masks
         self.dataset_directory = dataset_directory
         self.batch_size = batch_size
         self.dim = dim

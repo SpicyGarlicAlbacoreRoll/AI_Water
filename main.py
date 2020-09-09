@@ -55,7 +55,7 @@ def test_wrapper(args: Namespace) -> None:
     #         predictions, data_iter, metadata
     #     )
     # else:
-    predictions, test_batch_metadata = test_model_timeseries(
+    predictions, test_batch_metadata, input_metadata = test_model_timeseries(
         model, args.dataset, args.edit
     )
 
@@ -79,25 +79,27 @@ def test_wrapper(args: Namespace) -> None:
         # for sample in batch
         for idy, sample in enumerate(batch):
             # print(len(sample))
-            timeseries_mask_pair = {}
+            timeseries_sample = {}
             # for timestep in sample
             sample_timesteps = []
-            for vv, vh in sample[0]:
+            if idx ==0:
+                print(sample)
+            # for sub_dataset, frame_index  in sample:
                 
                 # for vh, vv in timeseries:
-                vh_vv_pair = {"vh": vh, "vv": vv}
-                sample_timesteps.append(vh_vv_pair)
-            
-            timeseries_mask_pair["mask"] = sample[1]
-            timeseries_mask_pair["timesteps"] = sample_timesteps
+                # vh_vv_pair = {"vh": vh, "vv": vv}
+            sample_timesteps = input_metadata[sample[0]][sample[1]]
+            # sample_timesteps = sub_dataset
+            # timeseries_mask_pair["mask"] = sample[1]
+            timeseries_sample["timesteps"] = sample_timesteps
             # The name of the prediction produced by this sample
 
             # prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
-            prediction_file_name="predictions/{0}/batch_{1}".format(prediction_directory_name, idx, idy)
-            sample_data = {"sample_{0}".format(idy): timeseries_mask_pair, "prediction": prediction_file_name}
+            prediction_file_name=f"predictions/{prediction_directory_name}/batch_{idx}/_sample{idy}"
+            sample_data = {f"sample_{idy}": timeseries_sample, "prediction": prediction_file_name}
             samples.append(sample_data)
 
-        metadata["batch_{0}".format(idx)].append(samples)
+        metadata[f"batch_{idx}"].append(samples)
 
 
 

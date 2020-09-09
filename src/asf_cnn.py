@@ -125,26 +125,14 @@ def test_model_timeseries(
     if verbose > 0:
         model.summary()
 
-    if edit:
-        dataset_data = load_replace_timeseries_data(dataset, dems)
+    metadata, test_iter = load_test_timeseries_dataset(dataset)
+    predictions = model.predict(
+        test_iter, verbose=verbose
+    )
 
-        predictions = model.predict(
-            dataset_data, verbose=verbose
-        )
-        # dataset_data.reset()
-        masked_predictions = predictions.round(decimals=0, out=None)
+    # in case our data is shuffled, keep track of which order and batch they're in
+    batch_metadata = test_iter.getBatchMetadata()
 
-        return masked_predictions, dataset_data[0], dataset_data[1]
+    masked_predictions = predictions.round(decimals=0, out=None)
 
-    else:
-        _, test_iter = load_test_timeseries_dataset(dataset)
-        predictions = model.predict(
-            test_iter, verbose=verbose
-        )
-
-        # in case our data is shuffled, keep track of which order and batch they're in
-        batch_metadata = test_iter.getBatchMetadata()
-
-        masked_predictions = predictions.round(decimals=0, out=None)
-
-        return masked_predictions, batch_metadata
+    return masked_predictions, batch_metadata, metadata
