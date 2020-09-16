@@ -11,7 +11,7 @@ from keras.backend import clear_session
 from keras.preprocessing.image import Iterator
 
 from .dataset.masked import load_dataset as load_dataset_masked
-from .dataset.crop_masked import load_timeseries_dataset, load_replace_timeseries_data, load_test_timeseries_dataset
+from .dataset.crop_masked import load_timeseries_dataset, load_test_timeseries_dataset
 from .dataset.masked import load_replace_data
 from .model import ModelType, model_type, save_model
 from .asf_typing import History
