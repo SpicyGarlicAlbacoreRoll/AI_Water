@@ -57,7 +57,7 @@ def conv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 16,
+    num_filters: int = 32,
     time_steps: int = 5,
     dropout: float = 0.1,
     batchnorm: bool = True
@@ -107,8 +107,9 @@ def create_cdl_model_masked(
     )
     clstmForwards_2 = ConvLSTM2D(num_filters, kernel_size=3, padding='same', return_sequences=False)
     clstmBlock_2 = Bidirectional(clstmForwards_2, merge_mode="sum")(c13)
-    final_conv = Conv2D(1, 1, activation='sigmoid')(clstmBlock_2)
-
+    final_layer = BatchNormalization()(clstmBlock_2)
+    final_conv = Conv2D(1, 1, activation='sigmoid')(final_layer)
+    
     model = Model(inputs=inputs, outputs=[final_conv])
 
     model.__asf_model_name = model_name
