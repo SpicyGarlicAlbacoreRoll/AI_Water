@@ -57,7 +57,7 @@ def conv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 32,
+    num_filters: int = 8,
     time_steps: int = 5,
     dropout: float = 0.1,
     batchnorm: bool = True
@@ -83,10 +83,11 @@ def create_cdl_model_masked(
 
     clstmForwards = ConvLSTM2D(num_filters * 4, kernel_size=3, padding='same', return_sequences=True)
     clstmBlock = Bidirectional(clstmForwards, merge_mode="sum")(p3)
+    clstmNormalized = TimeDistributed(BatchNormalization())(clstmBlock)
     # Expanding dims
     u11 = TimeDistributed(Conv2DTranspose(
         num_filters * 1, (3, 3), strides=(2, 2), padding='same'
-    ))(clstmBlock)
+    ))(clstmNormalized)
 
     u11 = concatenate([u11, c3])
     u11 = TimeDistributed(Dropout(dropout))(u11)
@@ -116,7 +117,7 @@ def create_cdl_model_masked(
 
     # Adam(lr=1e-3)
     model.compile(
-        loss='binary_crossentropy', optimizer=Adam(learning_rate=1e-3), metrics=["accuracy"]
+        loss='mean_squared_error', optimizer=Adam(learning_rate=1e-3), metrics=["accuracy"]
     )
 
     return model

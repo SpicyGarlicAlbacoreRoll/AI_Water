@@ -30,6 +30,9 @@ def train_wrapper(args: Namespace) -> None:
     if args.cont:
         model = load_model(model_name)
         history = model.__asf_model_history
+        model.compile(
+            loss='binary_crossentropy', optimizer='adam', metrics=["accuracy"]
+    )
     else:
         model_path = path_from_model_name(model_name)
         if not args.overwrite and os.path.isfile(model_path):
