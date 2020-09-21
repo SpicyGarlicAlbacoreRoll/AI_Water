@@ -18,6 +18,7 @@ from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
 from src.config import NETWORK_DEMS
 from PIL import Image 
+from keras.optimizers import Adam
 # from src.plots import edit_predictions, plot_predictions
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
@@ -30,9 +31,15 @@ def train_wrapper(args: Namespace) -> None:
     if args.cont:
         model = load_model(model_name)
         history = model.__asf_model_history
+        weights = model.get_weights()
+        # optimizer = model.optimizer
         model.compile(
-            loss='binary_crossentropy', optimizer='adam', metrics=["accuracy"]
-    )
+            loss="mse", optimizer=Adam(learning_rate=1e-3), metrics=[MeanIoU(num_classes=2)]
+        )
+        model.set_weights(weights)
+    #     model.compile(
+    #         loss='binary_crossentropy', optimizer='adam', metrics=["accuracy"]
+    # )
     else:
         model_path = path_from_model_name(model_name)
         if not args.overwrite and os.path.isfile(model_path):
@@ -41,7 +48,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "accuracy": [], "val_loss": [], "val_accuracy": [], }
+        history = {"loss": [], "mean_io_u": [], "val_loss": [], "val_mean_io_u": [], }
 
     train_model(model, history, args.dataset, args.epochs)
 

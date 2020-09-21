@@ -7,11 +7,11 @@ from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.merge import concatenate
 from keras.layers.pooling import MaxPooling2D
 from keras.models import Model
-from keras.optimizers import Adam
+from keras.optimizers import Adam, SGD
 from keras.losses import BinaryCrossentropy
 from keras.metrics import MeanIoU
 from src.config import NETWORK_DEMS as dems
-
+from model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss
 
 def conv2d_block_time_dist(
     input_tensor: Input,
@@ -57,7 +57,7 @@ def conv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 8,
+    num_filters: int = 16,
     time_steps: int = 5,
     dropout: float = 0.1,
     batchnorm: bool = True
@@ -117,7 +117,7 @@ def create_cdl_model_masked(
 
     # Adam(lr=1e-3)
     model.compile(
-        loss='mean_squared_error', optimizer=Adam(learning_rate=1e-3), metrics=["accuracy"]
+        loss='mse', optimizer=SGD(), metrics=[MeanIoU(num_classes=2)]
     )
 
     return model
