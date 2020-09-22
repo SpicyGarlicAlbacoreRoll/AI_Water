@@ -11,7 +11,7 @@ from keras.optimizers import Adam, SGD
 from keras.losses import BinaryCrossentropy
 from keras.metrics import MeanIoU
 from src.config import NETWORK_DEMS as dems
-from model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss
+from src.model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss
 
 def conv2d_block_time_dist(
     input_tensor: Input,
@@ -117,7 +117,7 @@ def create_cdl_model_masked(
 
     # Adam(lr=1e-3)
     model.compile(
-        loss='mse', optimizer=SGD(), metrics=[MeanIoU(num_classes=2)]
+        loss=dice_coefficient_loss, optimizer=SGD(), metrics=[MeanIoU(num_classes=2)]
     )
 
     return model

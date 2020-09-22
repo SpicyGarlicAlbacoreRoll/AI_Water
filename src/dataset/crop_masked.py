@@ -49,7 +49,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     train_iter = SARTimeseriesGenerator(
         train_metadata, 
         time_series_frames=frame_keys[:-split_index],
-        batch_size=1,
+        batch_size=4,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,

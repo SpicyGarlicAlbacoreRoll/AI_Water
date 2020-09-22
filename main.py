@@ -19,6 +19,7 @@ from src.model.architecture.masked import create_model_masked
 from src.config import NETWORK_DEMS
 from PIL import Image 
 from keras.optimizers import Adam
+from src.model.architecture.dice_loss import dice_coefficient_loss
 # from src.plots import edit_predictions, plot_predictions
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
@@ -34,7 +35,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss="mse", optimizer=Adam(learning_rate=1e-3), metrics=[MeanIoU(num_classes=2)]
+            loss=dice_coefficient_loss, optimizer=Adam(learning_rate=1e-3), metrics=[MeanIoU(num_classes=2)]
         )
         model.set_weights(weights)
     #     model.compile(
