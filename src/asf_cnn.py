@@ -26,7 +26,7 @@ def train_model(
     verbose: int = 1
 ) -> None:
     if verbose > 0:
-        model.summary()
+        model.summary(line_length=150)
 
     if model_type(model) == ModelType.MASKED:
         training_set, test_set = load_dataset_masked(dataset)
@@ -86,7 +86,7 @@ def test_model_masked(
     ) == ModelType.MASKED, "This function only works on masked models"
 
     if verbose > 0:
-        model.summary()
+        model.summary(line_length=150)
 
     if edit:
         dataset_data = load_replace_data(dataset, dems)
@@ -123,7 +123,7 @@ def test_model_timeseries(
     ) == ModelType.CROP_CLASSIFIER, "This function only works on timeseries models"
 
     if verbose > 0:
-        model.summary()
+        model.summary(line_length=150)
 
     metadata, test_iter = load_test_timeseries_dataset(dataset)
     predictions = model.predict(

@@ -6,6 +6,10 @@ from typing import Dict, List, Optional, Tuple
 
 import keras
 import numpy as np
+import cv2
+from albumentations import (
+    Compose, ToFloat
+)
 from src.gdal_wrapper import gdal_open
 from tensorflow import convert_to_tensor
 
@@ -15,7 +19,8 @@ from .asf_typing import TimeseriesMetadataFrameKey
 class SARTimeseriesGenerator(keras.utils.Sequence):
     def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(512, 512), 
     time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, 
-    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True):
+    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, augmentations=Compose([ToFloat(max_value=255)
+        ])):
         self.list_IDs = time_series_metadata
         self.frame_data = time_series_frames
         self.dataset_directory = dataset_directory
@@ -30,6 +35,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
         self.clip_range = clip_range
         self.metadata = []
+        self.augment = augmentations
         self.on_epoch_end()
 
     def __len__(self):
@@ -76,9 +82,9 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         vv = f.ReadAsArray()
                 except FileNotFoundError:
                     continue
-                
-                tile_array = np.stack((vh, vv), axis=2).astype('float32') / 255.0
 
+                tile_array = np.stack((vh, vv), axis=2).astype('float32')
+                tile_array = (tile_array - np.min(tile_array))/np.ptp(tile_array)
                 if self.clip_range:
                     min_, max_ = self.clip_range
                     np.clip(X, min_, max_, out=X)
@@ -103,7 +109,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
                 #convert list of vv vh composites to numpy array
                 x_stack = np.stack(time_series_stack, axis=0).astype('float32')
-
+                x_stack = np.stack([self.augment(image=x)["image"] for x in x_stack], axis=0)
                 subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
                 subset_mask_dir_name = f"{subset_name}_masks"
                 file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
@@ -124,6 +130,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 X[sample_idx,] = x_stack
                 y[sample_idx,] = mask_array
         
+                # X = np.stack([self.augment(image=x)["image"] for x in X], axis=0)
         # return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
         return convert_to_tensor(np.nan_to_num(X, nan=0, copy=False)), convert_to_tensor(np.nan_to_num(y, nan=0, copy=False))
 

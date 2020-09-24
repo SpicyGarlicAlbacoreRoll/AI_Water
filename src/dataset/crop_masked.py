@@ -6,12 +6,20 @@ the prepared data set for use.
 import json
 import os
 import re
+
 from math import floor
 from random import Random
 from typing import Dict, Generator, List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
+
+import cv2
+from albumentations import (
+    Compose, HorizontalFlip, CLAHE, HueSaturationValue,
+    RandomBrightness, RandomContrast, RandomGamma,
+    ToFloat, ShiftScaleRotate
+    )
 
 from ..asf_typing import TimeseriesMetadataFrameKey
 from ..config import NETWORK_DEMS
@@ -46,6 +54,19 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     print(f"Training Samples:\t{sample_size-split_index}")
     print(f"Validation Samples:\t{split_index}\n")
 
+    # augmentations applied to training data    
+    AUGMENTATIONS_TRAIN = Compose([
+        HorizontalFlip(p=0.5),
+        RandomContrast(limit=0.2, p=0.5),
+        RandomGamma(gamma_limit=(80, 120), p=0.5),
+        RandomBrightness(limit=0.2, p=0.5),
+        # CLAHE(p=1.0, clip_limit=2.0),
+        ShiftScaleRotate(
+            shift_limit=0.0625, scale_limit=0.1, 
+            rotate_limit=15, border_mode=cv2.BORDER_REFLECT_101, p=0.8), 
+        ToFloat(max_value=255)
+    ])
+
     train_iter = SARTimeseriesGenerator(
         train_metadata, 
         time_series_frames=frame_keys[:-split_index],
@@ -57,7 +78,8 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         output_channels=1,
         n_classes=2,
         dataset_directory=dataset_dir(dataset),
-        shuffle=True)
+        shuffle=True,
+        augmentations=AUGMENTATIONS_TRAIN)
 
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
@@ -70,7 +92,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         output_channels=1,
         n_classes=2,
         dataset_directory=dataset_dir(dataset),
-        shuffle=True)
+        shuffle=True,)
 
     return train_iter, validation_iter
 
