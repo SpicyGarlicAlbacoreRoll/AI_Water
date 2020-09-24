@@ -22,30 +22,42 @@ def conv2d_block_time_dist(
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
     # first layer
-    x = TimeDistributed(
-        Conv2D(
-            filters=num_filters,
-            kernel_size=(kernel_size, kernel_size),
-            kernel_initializer='he_normal',
-            padding='same'
-        )
-    )(input_tensor)
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
+    # x = TimeDistributed(
+    #     Conv2D(
+    #         filters=num_filters,
+    #         kernel_size=(kernel_size, kernel_size),
+    #         kernel_initializer='he_normal',
+    #         padding='same'
+    #     )
+    # )(input_tensor)
+    # x = Conv3D(
+    #         filters=num_filters,
+    #         kernel_size=(kernel_size, kernel_size, kernel_size),
+    #         kernel_initializer='he_normal',
+    #         padding='same'
+    #     )(input_tensor)
+    x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(input_tensor)
 
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
     # second layer
-    x = TimeDistributed(
-        Conv2D(
-            filters=num_filters,
-            kernel_size=(kernel_size, kernel_size),
-            kernel_initializer='he_normal',
-            padding='same'
-        )
-    )(input_tensor)
+    # x = Conv3D(
+    #     filters=num_filters,
+    #     kernel_size=(kernel_size, kernel_size, kernel_size),
+    #     kernel_initializer='he_normal',
+    #     padding='same'
+    # )(x)
+    # x = TimeDistributed(
+    #     Conv2D(
+    #         filters=num_filters,
+    #         kernel_size=(kernel_size, kernel_size),
+    #         kernel_initializer='he_normal',
+    #         padding='same'
+    #     )
+    # )(x)
 
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer='he_normal', padding='same', return_sequences=True)(input_tensor)
+    x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(x)
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
@@ -59,7 +71,7 @@ def create_cdl_model_masked(
     model_name: str,
     num_filters: int = 8,
     time_steps: int = 5,
-    dropout: float = 0.1,
+    dropout: float = 0.5,
     batchnorm: bool = True
 ) -> Model:
     """ Function to define the Time Distributed UNET Model """
@@ -134,14 +146,14 @@ def create_cdl_model_masked(
     # final_max_pool = GlobalAveragePooling3D()(c13)
     # reshaped = Reshape((64, 64, 1))(final_max_pool)
     # final_layer = Conv2D(1, 1, activation='sigmoid')(reshaped)
-    final_conv = TimeDistributed(Conv2D(1, 1))(c13)
-    final_normalization = TimeDistributed(BatchNormalization())(final_conv)
-    clstmForwards_2 = ConvLSTM2D(1, kernel_size=3, padding='same', activation='sigmoid', return_sequences=False)(final_normalization)
+    # final_conv = TimeDistributed(Conv2D(1, 1))(c13)
+    clstmForwards_2 = ConvLSTM2D(1, kernel_size=3, padding='same', activation="relu", return_sequences=False)(c13)
+    final_conv = Conv2D(1, 1, activation='sigmoid',)(clstmForwards_2)
     # clstmBlock_2 = Bidirectional(clstmForwards_2, merge_mode="sum")(c13)
     # final_layer = BatchNormalization()(clstmForwards_2)
     # # final_conv = Conv2D(1, 1, activation='sigmoid')(final_layer)
     # final_dense = Dense(1)(final_conv)
-    model = Model(inputs=inputs, outputs=[clstmForwards_2])
+    model = Model(inputs=inputs, outputs=[final_conv])
 
     model.__asf_model_name = model_name
 
