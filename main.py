@@ -17,9 +17,9 @@ from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
 from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
 from src.config import NETWORK_DEMS
-from PIL import Image 
+from PIL import Image, ImageOps
 from keras.optimizers import Adam
-from src.model.architecture.dice_loss import dice_coefficient_loss
+from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient 
 # from src.plots import edit_predictions, plot_predictions
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
@@ -35,7 +35,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=dice_coefficient_loss, optimizer=Adam(learning_rate=1e-3), metrics=[MeanIoU(num_classes=2)]
+            loss=dice_coefficient_loss, optimizer=Adam(), metrics=[dice_coefficient]
         )
         model.set_weights(weights)
     #     model.compile(
@@ -49,7 +49,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "mean_io_u": [], "val_loss": [], "val_mean_io_u": [], }
+        history = {"loss": [], "dice_coefficient": [], "val_loss": [], "val_dice_coefficient": [], }
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -130,12 +130,13 @@ def test_wrapper(args: Namespace) -> None:
 
         temp = np.array(image.reshape(-1, NETWORK_DEMS, NETWORK_DEMS, 1))
         for idz, frame in enumerate(range(temp.shape[0])):
-            img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.float32))
+            img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
+            img_0_contrast = ImageOps.autocontrast(img_0)
             # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
             # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-            filename_0 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_0.tif".format(prediction_directory_name, batch_index, idy, idz)
+            filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
             # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
-            img_0.save(filename_0)
+            img_0_contrast.save(filename_0)
             # img_1.save(filename_1)
                 
     # plot_predictions(
