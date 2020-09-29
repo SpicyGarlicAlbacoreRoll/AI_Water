@@ -55,6 +55,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     print(f"Training Samples:\t{sample_size-split_index}")
     print(f"Validation Samples:\t{split_index}\n")
 
+    time_steps = 2
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
         HorizontalFlip(p=0.5),
@@ -73,7 +74,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         time_series_frames=frame_keys[:-split_index],
         batch_size=32,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
-        time_steps=2,
+        time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
@@ -85,9 +86,9 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
         time_series_frames=frame_keys[-split_index:],
-        batch_size=1,
+        batch_size=32,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
-        time_steps=2,
+        time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,

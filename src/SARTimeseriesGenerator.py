@@ -129,7 +129,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                     continue
 
                 # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
-                mask_array = np.array(mask).astype('bool').reshape(self.output_dim[0], self.output_dim[1], 1)
+                mask_array = np.array(mask).astype('uint8').reshape(self.output_dim[0], self.output_dim[1], 1)
 
                 X[sample_idx,] = x_stack
                 y[sample_idx,] = mask_array
