@@ -19,6 +19,7 @@ from src.model.architecture.masked import create_model_masked
 from src.config import NETWORK_DEMS
 from PIL import Image, ImageOps
 from keras.optimizers import Adam
+from keras.metrics import MeanIoU
 from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient 
 # from src.plots import edit_predictions, plot_predictions
 
@@ -35,7 +36,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=dice_coefficient_loss, optimizer=Adam(), metrics=[dice_coefficient]
+            loss=dice_coefficient_loss, optimizer=Adam(), metrics=[MeanIoU(num_classes=2)]
         )
         model.set_weights(weights)
     #     model.compile(
@@ -49,7 +50,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "dice_coefficient": [], "val_loss": [], "val_dice_coefficient": [], }
+        history = {"loss": [], "mean_io_u": [], "val_loss": [], "val_mean_io_u": [], }
 
     train_model(model, history, args.dataset, args.epochs)
 

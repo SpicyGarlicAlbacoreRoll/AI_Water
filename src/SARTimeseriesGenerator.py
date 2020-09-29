@@ -2,6 +2,7 @@
 # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
 
 import os
+import random
 from typing import Dict, List, Optional, Tuple
 
 import keras
@@ -59,7 +60,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __data_generation(self, frame_data_temp):
         self.setBatchMetadata(frame_data_temp)
-
+        # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
         y = np.zeros((self.batch_size, 1, *self.output_dim, self.output_channels), dtype=np.float32)
@@ -71,7 +72,10 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             
             time_series = self.list_IDs[subset_sample][frame_number]
             time_series.sort()
-            for tileVH, tileVV in zip(time_series[0::2], time_series[1::2]):
+            # time_series = [time_series[0], time_series[1], time_series[-2], time_series[-1]]
+            vh_vv_pairs = [(tileVH, tileVV) for tileVH, tileVV in zip(time_series[0::2], time_series[1::2])]
+            random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
+            for tileVH, tileVV in random_selection:
                 try:
                     with gdal_open(os.path.join(self.dataset_directory,tileVH)) as f:
                         vh = f.ReadAsArray()

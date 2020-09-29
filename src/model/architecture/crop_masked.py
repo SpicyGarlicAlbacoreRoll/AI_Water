@@ -160,7 +160,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss=dice_coefficient_loss, optimizer=Adam(), metrics=[dice_coefficient]
+        loss=dice_coefficient_loss, optimizer=Adam(), metrics=[MeanIoU(num_classes=2)]
     )
 
     return model

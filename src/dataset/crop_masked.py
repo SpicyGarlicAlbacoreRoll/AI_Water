@@ -26,6 +26,7 @@ from ..config import NETWORK_DEMS
 from ..gdal_wrapper import gdal_open
 from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from .common import dataset_dir, valid_image
+from keras.metrics import MeanIoU
 
 """Loads the training and validation timeseries metadata for a given dataset, and returns two custom keras derived
 data generator iterators for that metadata, one for training data and one for validation data. 
@@ -70,9 +71,9 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     train_iter = SARTimeseriesGenerator(
         train_metadata, 
         time_series_frames=frame_keys[:-split_index],
-        batch_size=4,
+        batch_size=32,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
-        time_steps=time_steps,
+        time_steps=2,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
@@ -86,7 +87,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         time_series_frames=frame_keys[-split_index:],
         batch_size=1,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
-        time_steps=time_steps,
+        time_steps=2,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
