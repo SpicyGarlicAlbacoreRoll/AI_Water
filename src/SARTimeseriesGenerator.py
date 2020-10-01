@@ -42,7 +42,8 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __len__(self):
         #Returns amount of batches per epochs
-        return int(np.floor(len(self.frame_data) / self.batch_size))
+        print(int(np.floor(len(self.frame_data) * self.subsampling / self.batch_size)))
+        return int(np.floor(len(self.frame_data) * self.subsampling / self.batch_size))
 
     def __getitem__(self, index):
         # get indices in current batch
@@ -63,88 +64,95 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     def __data_generation(self, frame_data_temp):
         if not self.training:
             self.setBatchMetadata(frame_data_temp)
+        
+        stride = len(frame_data_temp)
         # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
-        X = np.zeros((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.zeros((self.batch_size, self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
+        X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
+        y = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
 
         #frame numbers are in the "ulx_0_uly_0" format
-        for sample_idx, (subset_sample, frame_number) in enumerate(frame_data_temp):
-            time_series_stack = []
-            time_series_mask = []
-            
-            time_series = self.list_IDs[subset_sample][frame_number]
-            time_series.sort()
-            # time_series = [time_series[0], time_series[1], time_series[-2], time_series[-1]]
-            vh_vv_pairs = [(tileVH, tileVV) for tileVH, tileVV in zip(time_series[0::2], time_series[1::2])]
-            random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
-            for tileVH, tileVV in random_selection:
-                try:
-                    with gdal_open(os.path.join(self.dataset_directory,tileVH)) as f:
-                        vh = f.ReadAsArray()
-                except FileNotFoundError:
-                    continue
-                try:
-                    with gdal_open(os.path.join(self.dataset_directory,tileVV)) as f:
-                        vv = f.ReadAsArray()
-                except FileNotFoundError:
-                    continue
-
-                tile_array = np.stack((vh, vv), axis=2).astype('float32')
-                if np.ptp(tile_array) == 0:
-                    tile_array = (tile_array - np.min(tile_array))/ 1
-                else:
-                    tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
-                if self.clip_range:
-                    min_, max_ = self.clip_range
-                    np.clip(X, min_, max_, out=X)
+        for subsample in range(self.subsampling):
+            for sample_idx, (subset_sample, frame_number) in enumerate(frame_data_temp):
+                time_series_stack = []
+                time_series_mask = []
                 
-                time_series_stack.append(tile_array)
-            
-            if len(time_series_stack) != 0:
+                time_series = self.list_IDs[subset_sample][frame_number]
+                time_series.sort()
+                # time_series = [time_series[0], time_series[1], time_series[-2], time_series[-1]]
+                # sub_sample_x = np.zeros((self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
+                # sub_sample_y = np.zeros((self.subsampling, self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
+                vh_vv_pairs = [(tileVH, tileVV) for tileVH, tileVV in zip(time_series[0::2], time_series[1::2])]
+                random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
+                for tileVH, tileVV in random_selection:
+                    try:
+                        with gdal_open(os.path.join(self.dataset_directory,tileVH)) as f:
+                            vh = f.ReadAsArray()
+                    except FileNotFoundError:
+                        continue
+                    try:
+                        with gdal_open(os.path.join(self.dataset_directory,tileVV)) as f:
+                            vv = f.ReadAsArray()
+                    except FileNotFoundError:
+                        continue
 
-                # if we end up with a stack with less than the set amount of timesteps, 
-                # append existing elements until we get enough timesteps
-
-                # We have three options to work around this problem of variable timesteps we either
-                    # Removing rows with missing values.
-                    # Mark and learn missing values.
-                    # Mask and learn without missing values.
-                if len(time_series_stack) < self.time_steps:
-                    idx = len(time_series_stack)
-                    temp = time_series_stack[0]
-                    while(idx != self.time_steps):
-                        time_series_stack.append(temp)
-                        idx+=1
-
-                #convert list of vv vh composites to numpy array
-                x_stack = np.stack(time_series_stack, axis=0).astype('float32')
-                x_stack = np.stack([self.augment(image=x)["image"] for x in x_stack], axis=0)
-                subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
-                subset_mask_dir_name = f"{subset_name}_masks"
-                file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
-                mask = 0
-                try:
-                    if self.training:
-                        with gdal_open(os.path.join(self.dataset_directory, "train", subset_mask_dir_name, file_name)) as f:
-                            mask = f.ReadAsArray()
+                    tile_array = np.stack((vh, vv), axis=2).astype('float32')
+                    if np.ptp(tile_array) == 0:
+                        tile_array = (tile_array - np.min(tile_array))/ 1
                     else:
-                        with gdal_open(os.path.join(self.dataset_directory, "test", subset_mask_dir_name, file_name)) as f:
-                            mask = f.ReadAsArray()
-                except FileNotFoundError:
-                    continue
+                        tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
+                    if self.clip_range:
+                        min_, max_ = self.clip_range
+                        np.clip(X, min_, max_, out=X)
+                    
+                    time_series_stack.append(tile_array)
+                
+                if len(time_series_stack) != 0:
 
-                # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
-                mask_array = np.array(mask).astype('uint8').reshape(self.output_dim[0], self.output_dim[1], 1)
-                mask_array_stacked = np.zeros((self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
+                    # if we end up with a stack with less than the set amount of timesteps, 
+                    # append existing elements until we get enough timesteps
 
-                for idx, step in enumerate(mask_array_stacked):
-                    mask_array_stacked[idx,] = mask_array
-                # print(mask_array_stacked.shape)
-                X[sample_idx,] = x_stack
-                y[sample_idx,] = mask_array
-        
-                # X = np.stack([self.augment(image=x)["image"] for x in X], axis=0)
+                    # We have three options to work around this problem of variable timesteps we either
+                        # Removing rows with missing values.
+                        # Mark and learn missing values.
+                        # Mask and learn without missing values.
+                    if len(time_series_stack) < self.time_steps:
+                        idx = len(time_series_stack)
+                        temp = time_series_stack[0]
+                        while(idx != self.time_steps):
+                            time_series_stack.append(temp)
+                            idx+=1
+
+                    #convert list of vv vh composites to numpy array
+                    x_stack = np.stack(time_series_stack, axis=0).astype('float32')
+                    x_stack = np.stack([self.augment(image=x)["image"] for x in x_stack], axis=0)
+                    subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
+                    subset_mask_dir_name = f"{subset_name}_masks"
+                    file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
+                    mask = 0
+                    try:
+                        if self.training:
+                            with gdal_open(os.path.join(self.dataset_directory, "train", subset_mask_dir_name, file_name)) as f:
+                                mask = f.ReadAsArray()
+                        else:
+                            with gdal_open(os.path.join(self.dataset_directory, "test", subset_mask_dir_name, file_name)) as f:
+                                mask = f.ReadAsArray()
+                    except FileNotFoundError:
+                        continue
+
+                    # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
+                    mask_array = np.array(mask).astype('uint8').reshape(self.output_dim[0], self.output_dim[1], 1)
+                    mask_array_stacked = np.zeros((self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
+
+                    for idx, step in enumerate(mask_array_stacked):
+                        mask_array_stacked[idx,] = mask_array
+                    # print(mask_array_stacked.shape)
+                    # sub_sample_x[subset_sample_idx,] = x_stack
+                    # sub_sample_y[subset_sample_idx,] = mask_array_stacked
+                    X[sample_idx + subsample*stride,] = x_stack
+                    y[sample_idx + subsample*stride,] = mask_array_stacked
+                
+                    # X = np.stack([self.augment(image=x)["image"] for x in X], axis=0)
         # return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
         return convert_to_tensor(np.nan_to_num(X, nan=0, copy=False)), convert_to_tensor(np.nan_to_num(y, nan=0, copy=False))
 
