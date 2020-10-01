@@ -20,7 +20,7 @@ from .asf_typing import TimeseriesMetadataFrameKey
 class SARTimeseriesGenerator(keras.utils.Sequence):
     def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(512, 512), 
     time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, 
-    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, augmentations=Compose([ToFloat(max_value=255)
+    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255)
         ])):
         self.list_IDs = time_series_metadata
         self.frame_data = time_series_frames
@@ -36,6 +36,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
         self.clip_range = clip_range
         self.metadata = []
+        self.subsampling = subsampling
         self.augment = augmentations
         self.on_epoch_end()
 
@@ -46,6 +47,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     def __getitem__(self, index):
         # get indices in current batch
         indexes = self.indexes[index*self.batch_size : (index+1) * self.batch_size]
+        # indexes = self.index
         # get list of IDs
         frame_data_temp = [self.frame_data[k] for k in indexes]
         
@@ -59,11 +61,12 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
 
     def __data_generation(self, frame_data_temp):
-        self.setBatchMetadata(frame_data_temp)
+        if not self.training:
+            self.setBatchMetadata(frame_data_temp)
         # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.zeros((self.batch_size, 1, *self.output_dim, self.output_channels), dtype=np.float32)
+        y = np.zeros((self.batch_size, self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
 
         #frame numbers are in the "ulx_0_uly_0" format
         for sample_idx, (subset_sample, frame_number) in enumerate(frame_data_temp):
@@ -88,7 +91,10 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                     continue
 
                 tile_array = np.stack((vh, vv), axis=2).astype('float32')
-                tile_array = (tile_array - np.min(tile_array))/np.ptp(tile_array)
+                if np.ptp(tile_array) == 0:
+                    tile_array = (tile_array - np.min(tile_array))/ 1
+                else:
+                    tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
                 if self.clip_range:
                     min_, max_ = self.clip_range
                     np.clip(X, min_, max_, out=X)
@@ -130,7 +136,11 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
                 # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
                 mask_array = np.array(mask).astype('uint8').reshape(self.output_dim[0], self.output_dim[1], 1)
+                mask_array_stacked = np.zeros((self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
 
+                for idx, step in enumerate(mask_array_stacked):
+                    mask_array_stacked[idx,] = mask_array
+                # print(mask_array_stacked.shape)
                 X[sample_idx,] = x_stack
                 y[sample_idx,] = mask_array
         
