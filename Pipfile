@@ -11,6 +11,7 @@ mock = "*"
 matplotlib = "*"
 
 [packages]
+albumentations = "*"
 tensorflow = "*"
 keras = "*"
 typing-extensions = "*"

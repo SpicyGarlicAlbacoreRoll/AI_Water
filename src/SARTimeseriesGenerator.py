@@ -4,7 +4,7 @@
 import os
 import random
 from typing import Dict, List, Optional, Tuple
-
+from src.config import TIME_STEPS, NETWORK_DEMS
 import keras
 import numpy as np
 import cv2
@@ -18,9 +18,9 @@ from .asf_typing import TimeseriesMetadataFrameKey
 
 """Takes metadata dictionary and list of timeseriesMetadataFrameKeys (dataset name, key) to access said sample."""
 class SARTimeseriesGenerator(keras.utils.Sequence):
-    def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(512, 512), 
-    time_steps=1, n_channels=2, output_dim=(512, 512), output_channels=1, 
-    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255)
+    def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(NETWORK_DEMS,NETWORK_DEMS), 
+    time_steps=TIME_STEPS, n_channels=2, output_dim=(NETWORK_DEMS, NETWORK_DEMS), output_channels=1, 
+    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0)
         ])):
         self.list_IDs = time_series_metadata
         self.frame_data = time_series_frames
@@ -42,7 +42,6 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __len__(self):
         #Returns amount of batches per epochs
-        print(int(np.floor(len(self.frame_data) * self.subsampling / self.batch_size)))
         return int(np.floor(len(self.frame_data) * self.subsampling / self.batch_size))
 
     def __getitem__(self, index):
@@ -64,14 +63,17 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     def __data_generation(self, frame_data_temp):
         if not self.training:
             self.setBatchMetadata(frame_data_temp)
-        
+        if len(frame_data_temp) == 0:
+            print("FRAME DATA EMPTY")
         stride = len(frame_data_temp)
         # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
+        y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 1), dtype=np.uint8)
 
         #frame numbers are in the "ulx_0_uly_0" format
+        last_valid = []
+        last_mask = []
         for subsample in range(self.subsampling):
             for sample_idx, (subset_sample, frame_number) in enumerate(frame_data_temp):
                 time_series_stack = []
@@ -97,16 +99,18 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         continue
 
                     tile_array = np.stack((vh, vv), axis=2).astype('float32')
+                    
                     if np.ptp(tile_array) == 0:
-                        tile_array = (tile_array - np.min(tile_array))/ 1
+                        tile_array = np.ones(shape=(*self.dim, 2)).astype('float32')
                     else:
                         tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
                     if self.clip_range:
                         min_, max_ = self.clip_range
                         np.clip(X, min_, max_, out=X)
-                    
+                    # print(np.ptp(tile_array))
                     time_series_stack.append(tile_array)
                 
+                # print(np.ptp(time_series_stack))
                 if len(time_series_stack) != 0:
 
                     # if we end up with a stack with less than the set amount of timesteps, 
@@ -124,8 +128,12 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                             idx+=1
 
                     #convert list of vv vh composites to numpy array
-                    x_stack = np.stack(time_series_stack, axis=0).astype('float32')
-                    x_stack = np.stack([self.augment(image=x)["image"] for x in x_stack], axis=0)
+                    x_stack = np.stack(time_series_stack, axis=0)
+                    # print(np.ptp(x_stack))
+                    # print(x_stack.shape)
+                    x_stack_augmented = np.stack([self.augment(image=img)["image"] for img in x_stack])
+                    # print(np.ptp(x_stack))
+                    # print(x_stack.shape)
                     subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
                     subset_mask_dir_name = f"{subset_name}_masks"
                     file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
@@ -141,20 +149,38 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         continue
 
                     # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
-                    mask_array = np.array(mask).astype('uint8').reshape(self.output_dim[0], self.output_dim[1], 1)
-                    mask_array_stacked = np.zeros((self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
-
-                    for idx, step in enumerate(mask_array_stacked):
-                        mask_array_stacked[idx,] = mask_array
+                    mask_array = np.array(mask).astype('uint8').reshape((1, *self.output_dim, 3))
+                    scaled= mask_array/255
+                    
+                    # print(np.ptp(mask_array))
+                    # mask_array_stacked = np.zeros((self.time_steps, 64*64, 1), dtype=np.uint8)
+                    # mask_array_stacked = []
+                    # for idx in range(self.time_steps):
+                    #     mask_array_stacked[idx,] = mask_array
                     # print(mask_array_stacked.shape)
                     # sub_sample_x[subset_sample_idx,] = x_stack
                     # sub_sample_y[subset_sample_idx,] = mask_array_stacked
-                    X[sample_idx + subsample*stride,] = x_stack
-                    y[sample_idx + subsample*stride,] = mask_array_stacked
-                
+                    if np.ptp(x_stack) == 0.0 and last_valid != []:
+                        # print("set 0 to last valid")
+                        x_stack_augmented = last_valid
+                        scaled = last_mask
+                    elif np.ptp(x_stack) != 0.0:
+                        last_valid = x_stack_augmented
+                        last_mask = scaled
+                    
+                    rgb_weights = [0.2989, 0.5870, 0.1140]
+
+                    grayscale_mask = np.dot(scaled[...,:3], rgb_weights).reshape((1, *self.output_dim, 1))
+                    # mask = (scaled[:,:,0] == 255) & (scaled[:,:,1] == 255) & (scaled[:,:,2] == 0)
+                    # mask_stacked = np.squeeze(np.stack([scaled for idx in range(10)], axis=-1))
+                    X[sample_idx + subsample*stride,] = x_stack_augmented
+                    y[sample_idx + subsample*stride,] = grayscale_mask
+
+                    
                     # X = np.stack([self.augment(image=x)["image"] for x in X], axis=0)
         # return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
-        return convert_to_tensor(np.nan_to_num(X, nan=0, copy=False)), convert_to_tensor(np.nan_to_num(y, nan=0, copy=False))
+        # print(np.ptp(X), "\t", np.ptp(y))
+        return np.nan_to_num(X, nan=0, copy=False), np.nan_to_num(y, nan=0, copy=False)
 
 
     # Non-keras.utils.Sequence functions

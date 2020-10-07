@@ -12,7 +12,7 @@ ls prep_tiles/ | grep 'S.*.tif' | while read -r line ; do
     # echo "$line"
     TILE=$line
     echo $TILE
-    /usr/bin/python3 scripts/prepare_data.py tile $TILE 64 && cd prep_tiles && rm $TILE && cd ..
+    /usr/bin/python3 scripts/prepare_data.py tile $TILE 128 && cd prep_tiles && rm $TILE && cd ..
     
     
     cd prep_tiles
@@ -23,7 +23,7 @@ done
 ls prep_tiles/ | grep '.*mask.tif' | while read -r line ; do
     MASK=$line
     echo $MASK
-    /usr/bin/python3 scripts/prepare_data.py tile $MASK 64
+    /usr/bin/python3 scripts/prepare_data.py tile $MASK 128
     cd prep_tiles
     find ./ -maxdepth 1 -iname "*ulx*tif" -exec mv {} mask_tiles \; 
     cd ..

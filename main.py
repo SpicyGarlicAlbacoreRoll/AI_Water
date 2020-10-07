@@ -50,7 +50,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "mean_io_u": [], "val_loss": [], "val_mean_io_u": [], }
+        history = {"loss": [], "mean_io_u": [], "val_accuracy": [], "val_loss": [], "val_mean_io_u": [], "val_accuracy": [] }
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -125,6 +125,7 @@ def test_wrapper(args: Namespace) -> None:
     # set to -1 to account for 0 mod 4 = 0 in batch_indexing
     
     batch_index = 0
+    non_blank_predictions = 0
     for idy, image in enumerate(predictions):
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
@@ -132,17 +133,17 @@ def test_wrapper(args: Namespace) -> None:
         temp = np.array(image.reshape(-1, NETWORK_DEMS, NETWORK_DEMS, 1))
         for idz, frame in enumerate(range(temp.shape[0])):
             img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
-            img_0_contrast = ImageOps.autocontrast(img_0)
-            # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
-            # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-            filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
-            # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
-            img_0_contrast.save(filename_0)
-            # img_1.save(filename_1)
-                
-    # plot_predictions(
-    #     predictions, test_iter
-    # )
+            if np.ptp(img_0) != 0:
+                non_blank_predictions+=1
+                # img_0_contrast = ImageOps.autocontrast(img_0)
+                # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
+                # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
+                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+                # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
+                img_0.save(filename_0)
+                # img_0_contrast.save(filename_0.replace(".tif", ".png"))
+                # img_1.save(filename_1)
+    print(f"Total non-blank predictions saved: {non_blank_predictions} out of {model_batch_size*len(predictions)} predictions")
 
 
 if __name__ == '__main__':
