@@ -86,7 +86,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=3,
-        n_classes=10,
+        n_classes=11,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
         subsampling=sub_sampling,
@@ -94,14 +94,14 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
 
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
-        time_series_frames=frame_keys[int(-split_index*.1):],
+        time_series_frames=frame_keys[int(-split_index):],
         batch_size=batch_size,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=3,
-        n_classes=10,
+        n_classes=11,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,)
 
@@ -127,7 +127,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
         output_channels=3,
         subsampling=sub_sampling,
         dataset_directory=dataset_dir(dataset),
-        n_classes=10,
+        n_classes=11,
         training=False,
         shuffle=False)
     

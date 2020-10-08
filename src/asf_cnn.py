@@ -59,7 +59,7 @@ def train_model(
         history = model.fit(
             x=training_set,
             validation_data=validation_set,
-            steps_per_epoch=200,
+            # steps_per_epoch=200,
             epochs=1,
             workers=8,
             verbose=verbose)
@@ -127,7 +127,7 @@ def test_model_timeseries(
         model.summary(line_length=150)
 
     metadata, test_iter = load_test_timeseries_dataset(dataset)
-    predictions = model.predict(
+    predictions = model.predict_class(
         test_iter, verbose=verbose
     )
 

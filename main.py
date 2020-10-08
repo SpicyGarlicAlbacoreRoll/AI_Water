@@ -36,7 +36,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=dice_coefficient_loss, optimizer=Adam(), metrics=[MeanIoU(num_classes=2)]
+            loss=dice_coefficient_loss, optimizer=Adam(), metrics=['categorical_accuracy']
         )
         model.set_weights(weights)
     #     model.compile(
@@ -50,7 +50,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [], "mean_io_u": [], "val_accuracy": [], "val_loss": [], "val_mean_io_u": [], "val_accuracy": [] }
+        history = {"loss": [],  'categorical_accuracy': [], "val_loss": [], "val_categorical_accuracy": [] }
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -123,26 +123,34 @@ def test_wrapper(args: Namespace) -> None:
     for idx in range(len(test_batch_metadata)):
         os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, idx))
     # set to -1 to account for 0 mod 4 = 0 in batch_indexing
-    
+    print(len(predictions))
+    print(f"Sample Shape: {predictions[0].shape}")
     batch_index = 0
     non_blank_predictions = 0
     for idy, image in enumerate(predictions):
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
 
-        temp = np.array(image.reshape(-1, NETWORK_DEMS, NETWORK_DEMS, 1))
-        for idz, frame in enumerate(range(temp.shape[0])):
-            img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
-            if np.ptp(img_0) != 0:
+        images = np.array(image.reshape(NETWORK_DEMS, NETWORK_DEMS, 11))
+        # for idz, frame in enumerate(range(temp.shape[0])):
+            # img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
+            # imgs = temp[idz, :, : :]
+            # for idx in range(temp.shape[-1]):
+
+            # for img in temp[idz, :, :, :]:
+            # for idx in 
+        for channel_number in range(images.shape[-1]):
+            img = array_to_img(images[:, :, channel_number].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
+            if np.ptp(img) != 0:
                 non_blank_predictions+=1
                 # img_0_contrast = ImageOps.autocontrast(img_0)
                 # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
                 # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}_class{3}.tif".format(prediction_directory_name, batch_index, idy, channel_number)
                 # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
-                img_0.save(filename_0)
-                # img_0_contrast.save(filename_0.replace(".tif", ".png"))
-                # img_1.save(filename_1)
+                img.save(filename_0)
+                        # img_0_contrast.save(filename_0.replace(".tif", ".png"))
+                        # img_1.save(filename_1)
     print(f"Total non-blank predictions saved: {non_blank_predictions} out of {model_batch_size*len(predictions)} predictions")
 
 

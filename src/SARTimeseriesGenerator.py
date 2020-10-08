@@ -22,6 +22,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     time_steps=TIME_STEPS, n_channels=2, output_dim=(NETWORK_DEMS, NETWORK_DEMS), output_channels=1, 
     n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0)
         ])):
+        self.class_mode = 'categorical'
         self.list_IDs = time_series_metadata
         self.frame_data = time_series_frames
         self.dataset_directory = dataset_directory
@@ -38,6 +39,19 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         self.metadata = []
         self.subsampling = subsampling
         self.augment = augmentations
+        self.crop_classes = [
+            (np.asarray([0, 0, 0]), 0),
+            (np.asarray([229, 208, 18]), 1),
+            (np.asarray([203, 79, 128]), 2),
+            (np.asarray([42, 116, 80]), 3),
+            (np.asarray([255, 148, 33]), 4),
+            (np.asarray([89, 210, 176]), 5),
+            (np.asarray([83, 43, 116]), 6),
+            (np.asarray([205, 139, 25]), 7),
+            (np.asarray([205, 173, 117]), 8),
+            (np.asarray([205, 194, 175]), 9),
+            (np.asarray([182, 89, 210]), 10)
+        ]
         self.on_epoch_end()
 
     def __len__(self):
@@ -69,7 +83,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 1), dtype=np.uint8)
+        y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 11), dtype=np.uint8)
 
         #frame numbers are in the "ulx_0_uly_0" format
         last_valid = []
@@ -148,33 +162,25 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                     except FileNotFoundError:
                         continue
 
-                    # mask_array = np.array(mask).astype('float32').reshape(512, 512, 1) / 255.0
-                    mask_array = np.array(mask).astype('uint8').reshape((1, *self.output_dim, 3))
-                    scaled= mask_array/255
-                    
-                    # print(np.ptp(mask_array))
-                    # mask_array_stacked = np.zeros((self.time_steps, 64*64, 1), dtype=np.uint8)
-                    # mask_array_stacked = []
-                    # for idx in range(self.time_steps):
-                    #     mask_array_stacked[idx,] = mask_array
-                    # print(mask_array_stacked.shape)
-                    # sub_sample_x[subset_sample_idx,] = x_stack
-                    # sub_sample_y[subset_sample_idx,] = mask_array_stacked
+                    mask_array = np.array(mask).astype('uint8')
+                    n_classes = 11
+                    one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
+                    for i, unique_value in enumerate(np.unique(mask_array)):
+                        one_hot[:, :, i][mask_array == unique_value] = 1
+
                     if np.ptp(x_stack) == 0.0 and last_valid != []:
                         # print("set 0 to last valid")
                         x_stack_augmented = last_valid
-                        scaled = last_mask
+                        one_hot = last_mask
                     elif np.ptp(x_stack) != 0.0:
                         last_valid = x_stack_augmented
-                        last_mask = scaled
+                        last_mask = one_hot
                     
-                    rgb_weights = [0.2989, 0.5870, 0.1140]
+                    # unique = np.unique(mask_array.reshape(-1, data.shape[2]), axis=0)
+                    categorical_mask = []
 
-                    grayscale_mask = np.dot(scaled[...,:3], rgb_weights).reshape((1, *self.output_dim, 1))
-                    # mask = (scaled[:,:,0] == 255) & (scaled[:,:,1] == 255) & (scaled[:,:,2] == 0)
-                    # mask_stacked = np.squeeze(np.stack([scaled for idx in range(10)], axis=-1))
                     X[sample_idx + subsample*stride,] = x_stack_augmented
-                    y[sample_idx + subsample*stride,] = grayscale_mask
+                    y[sample_idx + subsample*stride,] = one_hot
 
                     
                     # X = np.stack([self.augment(image=x)["image"] for x in X], axis=0)
@@ -193,3 +199,16 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     # when each batch begins we record what files are passed to the model
     def setBatchMetadata(self, batch: Tuple[List[Tuple[str, str]], str]):
         self.metadata.append(batch)
+
+
+# Classes:
+# Corn: 229 208 18, 255
+# Cotton: 203, 79, 128, 255
+# Rice: 42, 116, 80, 255
+# Sorghum: 255, 148, 33, 255
+# Soybeans: 89, 210, 176, 255
+# Peanuts: 83, 43, 116, 255
+# Sprint Wheat: 205, 139, 25, 255
+# Winter Wheat: 205, 173, 117, 255
+# Dbl Crop WinWht/Corn: 205, 194, 175, 255
+# Alfalfa: 182, 89, 210, 255

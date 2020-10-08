@@ -13,7 +13,7 @@ from keras.metrics import MeanIoU
 import tensorflow as tf
 from src.config import NETWORK_DEMS as dems
 from src.config import TIME_STEPS
-from src.model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss, jaccard_distance_loss
+from src.model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss, jaccard_distance_loss, CategoricalTruePositives
 
 def class_weighted_pixelwise_crossentropy(target, output):
     output = tf.clip_by_value(output, 10e-8, 1.-10e-8)
@@ -230,7 +230,7 @@ def create_cdl_model_masked(
     # final_lstm = LSTM(2*64*64*1)(flattened)
     # final_conv = Conv3D(1, 1, padding='same', activation="sigmoid")(c8)
     # final_conv = TimeDistributed(Conv2D(1, 1, activation='sigmoid'))(c8)
-    final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="softmax", padding='same', return_sequences=False)(c8)
+    final_conv = ConvLSTM2D(filters=11, kernel_size=1, activation="softmax", padding='same', return_sequences=False)(c8)
     # output_shape=28*128*4
     # final_layer = Reshape((-1))(final_conv)
     # clstmBlock_2 = Bidirectional(clstmForwards_2, merge_mode="sum")(c13)
@@ -244,8 +244,9 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss=SparseCategoricalCrossentropy(from_logits=True), optimizer=RMSprop(lr=1e-3), metrics=[MeanIoU(num_classes=11), 'accuracy']
+        loss=CategoricalCrossentropy(), optimizer=RMSprop(lr=1e-3), metrics=['categorical_accuracy' ]
     )
 
     return model
     
+

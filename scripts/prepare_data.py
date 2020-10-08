@@ -67,10 +67,10 @@ def make_tiles(ifname: str,
     # https://gdal.org/tutorials/raster_api_tut.html, get color interpretation name. If
     band = datafile.GetRasterBand(1)
     ct = band.GetColorInterpretation()
-    color_interp = 'grey'
-    if str(gdal.GetColorInterpretationName(ct)) == "Palette":
-        color_interp = 'rgb'
-    print(color_interp)
+    color_interp = 'gray'
+    # if str(gdal.GetColorInterpretationName(ct)) == "Palette":
+    #     color_interp = 'rgb'
+    # print(color_interp)
     
     for x in range(0, xsize, step_x):
         for y in range(0, ysize, step_y):
@@ -78,7 +78,6 @@ def make_tiles(ifname: str,
                 f'{iftitle}_ulx_{x}_uly_{y}.{ifext}',
                 img_fpath,
                 srcWin=[x, y, step_x, step_y],
-                rgbExpand=color_interp,
                 format="GTiff"
             )
 
