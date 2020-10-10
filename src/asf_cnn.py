@@ -127,9 +127,10 @@ def test_model_timeseries(
         model.summary(line_length=150)
 
     metadata, test_iter = load_test_timeseries_dataset(dataset)
-    predictions = model.predict_class(
+    predictions = model.predict(
         test_iter, verbose=verbose
     )
+    
 
     # in case our data is shuffled, keep track of which order and batch they're in
     batch_metadata = test_iter.getBatchMetadata()

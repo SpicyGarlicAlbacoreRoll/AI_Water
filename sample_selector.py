@@ -2,6 +2,10 @@ import random
 from random import Random
 from src.dataset.crop_masked import validate_image
 from tqdm import tqdm
+import numpy as np
+from src.gdal_wrapper import gdal_open
+import sys
+from sample_class_distribution import find_frequencies
 import os
 import re
 import json
@@ -9,6 +13,39 @@ import shutil
 from pathlib import Path
 from typing import Dict, List
 from math import floor
+import sys
+
+def valid_mask(frame_name, mask_dict) -> bool:
+    frame_name = f"{frame_name}.tif"
+    target_mask_file = mask_dict.get(frame_name)
+    if target_mask_file == None:
+        
+        return False
+    
+    output = []
+    target_mask_path = os.path.join(os.getcwd(), "prep_tiles", "mask_tiles", target_mask_file)
+    try:
+        with gdal_open(target_mask_path) as f:
+            output = f.ReadAsArray()
+    except FileNotFoundError:
+        sys.exit(f"File {target_mask_file} not found!")
+    
+    output_arr = np.asarray(output).flatten()
+    image_size = len(output_arr)
+    unique_classes, unique_count = np.unique(output_arr, return_counts=True)
+    class_dict = dict(zip(unique_classes, unique_count))
+    frequency_dict = find_frequencies(class_dict, unique_classes, image_size)
+    
+   
+    if frequency_dict.get("6") == None:
+        return True
+
+    # ignore cropmask files that are primarily filled over half with 6 (background, qgis no-data value)
+    if frequency_dict.get("6") > 0.5:
+        # print(frame_name)
+        return False
+
+    return True
 
 def get_tiles(files: List) -> (Dict, List):
     frames = {}
@@ -87,8 +124,14 @@ def create_sample_split() -> None:
     updated_frames["test"] = {}
     updated_frames["train"] = {}
     prep_tiles_path = os.path.join(os.getcwd(), "prep_tiles/")
+    mask_files = os.listdir(os.path.join(os.getcwd(), "prep_tiles", "mask_tiles"))
+    mask_dict = dict(zip(["_".join(mask_file_name.split("_")[4:]) for mask_file_name in mask_files], mask_files))
     for test_frame_name in tqdm(test_data_frame_names):
         updated_frames["test"][test_frame_name] = []
+        if not valid_mask(test_frame_name, mask_dict):
+            updated_frames["test"].pop(test_frame_name, None)
+            continue
+        # if frames[test_frame_name]
         for vv, vh in frames[test_frame_name]:
             if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
                 continue
@@ -96,6 +139,8 @@ def create_sample_split() -> None:
                 continue
             # vv_file_name = Path(vv).name
             # vh_file_name = Path(vh).name
+            
+
 
             shutil.move(os.path.join(prep_tiles_path, "tiles/", vv), f"{dir_path}/test/{dir}")
             vv = f"test/{dir}/{vv}"
@@ -104,10 +149,24 @@ def create_sample_split() -> None:
             shutil.move(os.path.join(prep_tiles_path, "tiles/", vh), f"{dir_path}/test/{dir}")
             vh = f"test/{dir}/{vh}"
             updated_frames["test"][test_frame_name].append(vh)
+        
+        if len(updated_frames["test"][test_frame_name]) <= 1:
+            updated_frames["test"].pop(test_frame_name, None)
+        
+        temp = updated_frames['test'][test_frame_name]
+        temp.sort()
+        composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
+
+        # in cases where S1A and S1B are in the same list they are sorted by dates
+        composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
+        updated_frames['test'][test_frame_name] = composite_temp
 
     print("Train data")
     for frame_name in tqdm(frame_names):
         updated_frames["train"][frame_name] = []
+        if not valid_mask(frame_name, mask_dict):
+            updated_frames["train"].pop(frame_name, None)
+            continue
         for vv, vh in frames[frame_name]:
             if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
                 continue
@@ -126,6 +185,18 @@ def create_sample_split() -> None:
             # vh = f"train/{dir}/{vh_file_name}"
             vh = f"train/{dir}/{vh}"
             updated_frames["train"][frame_name].append(vh)
+
+        if len(updated_frames["train"][frame_name]) <= 1:
+            updated_frames["train"].pop(frame_name, None)
+
+        # sorting ahead of time speeds up model
+        temp = updated_frames['train'][frame_name]
+        temp.sort()
+        composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
+
+        # in cases where S1A and S1B are in the same list they are sorted by dates
+        composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
+        updated_frames['train'][frame_name] = composite_temp
 
     print("Training data finished")
     print("serializing metadata...")

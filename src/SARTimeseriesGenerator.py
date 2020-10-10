@@ -3,6 +3,7 @@
 
 import os
 import random
+import re
 from typing import Dict, List, Optional, Tuple
 from src.config import TIME_STEPS, NETWORK_DEMS
 import keras
@@ -20,7 +21,7 @@ from .asf_typing import TimeseriesMetadataFrameKey
 class SARTimeseriesGenerator(keras.utils.Sequence):
     def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(NETWORK_DEMS,NETWORK_DEMS), 
     time_steps=TIME_STEPS, n_channels=2, output_dim=(NETWORK_DEMS, NETWORK_DEMS), output_channels=1, 
-    n_classes=3, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0)
+    n_classes=7, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0)
         ])):
         self.class_mode = 'categorical'
         self.list_IDs = time_series_metadata
@@ -76,14 +77,14 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __data_generation(self, frame_data_temp):
         if not self.training:
-            self.setBatchMetadata(frame_data_temp)
+            self.__setBatchMetadata(frame_data_temp)
         if len(frame_data_temp) == 0:
             print("FRAME DATA EMPTY")
         stride = len(frame_data_temp)
         # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 11), dtype=np.uint8)
+        y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, self.n_classes), dtype=np.uint8)
 
         #frame numbers are in the "ulx_0_uly_0" format
         last_valid = []
@@ -92,14 +93,9 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             for sample_idx, (subset_sample, frame_number) in enumerate(frame_data_temp):
                 time_series_stack = []
                 time_series_mask = []
-                
-                time_series = self.list_IDs[subset_sample][frame_number]
-                time_series.sort()
-                # time_series = [time_series[0], time_series[1], time_series[-2], time_series[-1]]
-                # sub_sample_x = np.zeros((self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-                # sub_sample_y = np.zeros((self.subsampling, self.time_steps, *self.output_dim, self.output_channels), dtype=np.uint8)
-                vh_vv_pairs = [(tileVH, tileVV) for tileVH, tileVV in zip(time_series[0::2], time_series[1::2])]
-                random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
+
+                random_selection = self.__random_frame_sample(self.list_IDs[subset_sample][frame_number])
+
                 for tileVH, tileVV in random_selection:
                     try:
                         with gdal_open(os.path.join(self.dataset_directory,tileVH)) as f:
@@ -136,18 +132,17 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         # Mask and learn without missing values.
                     if len(time_series_stack) < self.time_steps:
                         idx = len(time_series_stack)
-                        temp = time_series_stack[0]
+                        # pad out the sequence with the last time step if there aren't enough timesteps
+                        temp = time_series_stack[-1]
                         while(idx != self.time_steps):
                             time_series_stack.append(temp)
                             idx+=1
 
                     #convert list of vv vh composites to numpy array
                     x_stack = np.stack(time_series_stack, axis=0)
-                    # print(np.ptp(x_stack))
-                    # print(x_stack.shape)
+
                     x_stack_augmented = np.stack([self.augment(image=img)["image"] for img in x_stack])
-                    # print(np.ptp(x_stack))
-                    # print(x_stack.shape)
+
                     subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
                     subset_mask_dir_name = f"{subset_name}_masks"
                     file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
@@ -163,10 +158,10 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         continue
 
                     mask_array = np.array(mask).astype('uint8')
-                    n_classes = 11
-                    one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
-                    for i, unique_value in enumerate(np.unique(mask_array)):
-                        one_hot[:, :, i][mask_array == unique_value] = 1
+                    one_hot = self.__to_one_hot(mask_array, self.n_classes)
+                    # one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
+                    # for i, unique_value in enumerate(np.unique(mask_array)):
+                    #     one_hot[:, :, i][mask_array == unique_value] = 1
 
                     if np.ptp(x_stack) == 0.0 and last_valid != []:
                         # print("set 0 to last valid")
@@ -191,13 +186,51 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     # Non-keras.utils.Sequence functions
 
+    # Encodes the time series mask, an image array of shape (dim, dim, 1), into a one-hot encoding form for Categorical CrossEntropy loss with softmax activation.
+    # Each unique pixel value represents a category, and the amount of unique pixel values should = the number of categories, including the background
+    # For each unique category we create a channel, and for each pixel in that category we assign a 1 to that pixel position in it's corresponding channel.
+    def __to_one_hot(self, mask_array, n_classes):
+        one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
+        for i, unique_value in enumerate(np.unique(mask_array)):
+            one_hot[:, :, i][mask_array == unique_value] = 1
+        
+        return one_hot
+
+    def __random_frame_sample(self, vh_vv_pairs: List):
+        random_selection = []
+        if len(vh_vv_pairs) >= 6:
+            # to ensure we get a good sample of a beginning middle and end
+            one_third = len(vh_vv_pairs)//3
+            beginning = vh_vv_pairs[:one_third]
+            middle = vh_vv_pairs[one_third:2*one_third]
+            end = vh_vv_pairs[2*one_third:]
+
+            if self.time_steps > 2:
+                # favor picking more time steps from the middle of the stack if timesteps can't be evenly distributed across
+                one_third_time_steps = self.time_steps // 3
+                middle_third_time_steps = self.time_steps - 2 * one_third_time_steps
+
+                random_selection.extend(random.sample(beginning, one_third_time_steps))
+                random_selection.extend(random.sample(middle, middle_third_time_steps))
+                random_selection.extend(random.sample(end, one_third_time_steps))
+            else:
+                random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
+        else:
+            random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
+        
+        #Ignore S1B / S1A in sorting
+        random_selection.sort(key=lambda pair: pair[0].split("_")[1:])
+
+        return random_selection
+    # def __sort_frames(composite_frame: Tuple[str, str]):
+
     # accessor to get metadata, ordered by input, contains strings of file paths and their 
     # crop mask in the order they're fed to the model
     def getBatchMetadata(self) -> List[Tuple[List[Tuple[str, str]], str]]:
         return self.metadata
 
     # when each batch begins we record what files are passed to the model
-    def setBatchMetadata(self, batch: Tuple[List[Tuple[str, str]], str]):
+    def __setBatchMetadata(self, batch: Tuple[List[Tuple[str, str]], str]):
         self.metadata.append(batch)
 
 

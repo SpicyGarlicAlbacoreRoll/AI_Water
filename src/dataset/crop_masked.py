@@ -54,6 +54,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     batch_size = 1
     time_steps = TIME_STEPS
     sub_sampling = 1
+    n_classes = 7
 
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
@@ -86,7 +87,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=3,
-        n_classes=11,
+        n_classes=n_classes,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
         subsampling=sub_sampling,
@@ -101,7 +102,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=3,
-        n_classes=11,
+        n_classes=n_classes,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,)
 
@@ -116,6 +117,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
     time_steps = TIME_STEPS
     sub_sampling = 1
     batch_size=1
+    n_classes=7
     test_iter = SARTimeseriesGenerator(
         test_metadata,
         time_series_frames=frame_keys,
@@ -127,7 +129,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
         output_channels=3,
         subsampling=sub_sampling,
         dataset_directory=dataset_dir(dataset),
-        n_classes=11,
+        n_classes=n_classes,
         training=False,
         shuffle=False)
     

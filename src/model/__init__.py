@@ -10,6 +10,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 from keras.models import Model
+from keras import Sequential
 from keras.models import load_model as kload_model
 
 from ..config import MODELS_DIR, NETWORK_DEMS
