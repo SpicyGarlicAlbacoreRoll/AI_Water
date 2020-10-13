@@ -4,6 +4,7 @@
 from tensorflow.python.framework.ops import disable_eager_execution
 from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D, Reshape, AveragePooling3D, Conv3D, Bidirectional, UpSampling2D, UpSampling3D
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
+# from keras.layers.recurrent import 
 from keras.layers.merge import concatenate
 from keras.layers.pooling import MaxPooling2D, MaxPooling3D, GlobalAveragePooling3D
 from keras.models import Model
@@ -30,14 +31,15 @@ def conv2d_block_time_dist(
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
     # first layer
-    x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(input_tensor)
-
+    convLSTM_layer = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)
+    x = Bidirectional(convLSTM_layer)(input_tensor)
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
     # second layer
 
-    x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(x)
+    x = Bidirectional(convLSTM_layer)(x)
+    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(x)
     if batchnorm:
         x = TimeDistributed(BatchNormalization())(x)
     x = TimeDistributed(Activation('relu'))(x)
