@@ -21,11 +21,18 @@ from .asf_typing import TimeseriesMetadataFrameKey
 class SARTimeseriesGenerator(keras.utils.Sequence):
     def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(NETWORK_DEMS,NETWORK_DEMS), 
     time_steps=TIME_STEPS, n_channels=2, output_dim=(NETWORK_DEMS, NETWORK_DEMS), output_channels=1, 
-    n_classes=7, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0)
-        ])):
+    n_classes=7, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0),
+        ]), loops=1):
         self.class_mode = 'categorical'
         self.list_IDs = time_series_metadata
-        self.frame_data = time_series_frames
+        self.frame_data = []
+        for loop in range(loops):
+            self.frame_data.extend(time_series_frames)
+        self.loop_idx = 0
+        self.loops = loops
+        # for loop in range(loops):
+        #     self.list_IDs.extend(time_series_metadata)
+
         self.dataset_directory = dataset_directory
         self.batch_size = batch_size
         self.dim = dim
@@ -61,6 +68,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         # get indices in current batch
+        # loop_offset = len(self.frame_data) * self.loop_idx
         indexes = self.indexes[index*self.batch_size : (index+1) * self.batch_size]
         # indexes = self.index
         # get list of IDs
@@ -84,8 +92,12 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         # self.time_steps = 2
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
-        y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, self.n_classes), dtype=np.uint8)
+        y = []
 
+        if self.n_classes > 2:
+            y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, self.n_classes), dtype=np.uint8)
+        else:
+            y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 1), dtype=np.uint8)
         #frame numbers are in the "ulx_0_uly_0" format
         last_valid = []
         last_mask = []
@@ -141,8 +153,8 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                     #convert list of vv vh composites to numpy array
                     x_stack = np.stack(time_series_stack, axis=0)
 
-                    x_stack_augmented = np.stack([self.augment(image=img)["image"] for img in x_stack])
-
+                    
+                    # print(f"Are arrays equivalent?:\t{np.array_equal(x_stack_augmented[0], x_stack_augmented[1])}")
                     subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
                     subset_mask_dir_name = f"{subset_name}_masks"
                     file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
@@ -159,6 +171,23 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
                     mask_array = np.array(mask).astype('uint8')
                     one_hot = self.__to_one_hot(mask_array, self.n_classes)
+                    x_stack_augmented = []
+
+                    augmentation_input = {}
+
+                    
+                    if self.training:
+                        for img_idx, img in enumerate(x_stack):
+                            augmentation_input[f"image{img_idx}"] = img
+                        # print(self.augment)
+                        aug_output = self.augment(image=x_stack[0], **augmentation_input, mask=one_hot)
+                        x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(x_stack))])
+                        one_hot = aug_output["mask"]
+                        # x_stack_augmented = np.stack([self.augment(image=img, mask=one_hot)[f"image{img_idx}"] for img_idx, img in enumerate(x_stack)])
+                        # x_stack_augmented = np.stack(self.augment(image0=x_stack[0], ))
+                    else:
+                        x_stack_augmented = x_stack
+                    
                     # one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
                     # for i, unique_value in enumerate(np.unique(mask_array)):
                     #     one_hot[:, :, i][mask_array == unique_value] = 1
@@ -190,10 +219,13 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     # Each unique pixel value represents a category, and the amount of unique pixel values should = the number of categories, including the background
     # For each unique category we create a channel, and for each pixel in that category we assign a 1 to that pixel position in it's corresponding channel.
     def __to_one_hot(self, mask_array, n_classes):
-        one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
-        for i, unique_value in enumerate(np.unique(mask_array)):
-            one_hot[:, :, i][mask_array == unique_value] = 1
-        
+        one_hot = []
+        if n_classes > 2:
+            one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
+            for i, unique_value in enumerate(np.unique(mask_array)):
+                one_hot[:, :, i][mask_array == unique_value] = 1
+        else:
+            one_hot = mask_array.reshape(*self.output_dim, 1)
         return one_hot
 
     def __random_frame_sample(self, vh_vv_pairs: List):

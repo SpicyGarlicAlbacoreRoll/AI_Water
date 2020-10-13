@@ -20,7 +20,7 @@ from src.config import NETWORK_DEMS
 from PIL import Image, ImageOps
 from keras.optimizers import Adam
 from keras.metrics import MeanIoU
-from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient 
+from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient
 # from src.plots import edit_predictions, plot_predictions
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
@@ -36,7 +36,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=dice_coefficient_loss, optimizer=Adam(), metrics=['categorical_accuracy']
+            loss='mean_squared_error', optimizer=Adam(), metrics=['accuracy']
         )
         model.set_weights(weights)
     #     model.compile(
@@ -50,7 +50,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [],  'categorical_accuracy': [], "val_loss": [], "val_categorical_accuracy": [] }
+        history = {"loss": [],  'accuracy': [], "val_loss": [], "val_accuracy": [] }
 
     train_model(model, history, args.dataset, args.epochs)
 
@@ -146,7 +146,7 @@ def test_wrapper(args: Namespace) -> None:
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
 
-        images = np.array(image.reshape(NETWORK_DEMS, NETWORK_DEMS, 11))
+        images = np.array(image.reshape(NETWORK_DEMS, NETWORK_DEMS, 1))
         # for idz, frame in enumerate(range(temp.shape[0])):
             # img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
             # imgs = temp[idz, :, : :]
@@ -155,30 +155,35 @@ def test_wrapper(args: Namespace) -> None:
             # for img in temp[idz, :, :, :]:
             # for idx in 
         # for channel_number in range(images.shape[-1]):
-        rgb_img = np.zeros((NETWORK_DEMS, NETWORK_DEMS, 3)).astype(dtype=np.uint8)
-        img = images.reshape(NETWORK_DEMS, NETWORK_DEMS, 11).astype(dtype=np.uint8)
+        # rgb_img = np.zeros((NETWORK_DEMS, NETWORK_DEMS, 3)).astype(dtype=np.uint8)
+        img = images.reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8)
 
         if np.ptp(img) != 0:
+            
             # prediction_mask = []
 
             # Assign class with max probability to a given pixel
             # if img.shape[-1] > 1:
-            prediction_mask = img.argmax(axis=-1)
-           
-            for color_idx in range(len(crop_classes)):
-                rgb_img[prediction_mask==color_idx] = crop_classes[color_idx]
-            
-            color_img =  array_to_img(rgb_img)
+            img_0 = array_to_img(img)
+            filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+            img_0.save(filename_0)
             non_blank_predictions+=1
-            # img_0_contrast = ImageOps.autocontrast(img_0)
-            # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
-            # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-            if np.ptp(rgb_img):
-                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
-                # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
-                color_img.save(filename_0)
-                    # img_0_contrast.save(filename_0.replace(".tif", ".png"))
-                    # img_1.save(filename_1)
+            # prediction_mask = img.argmax(axis=-1)
+           
+            # for color_idx in range(len(crop_classes)):
+            #     rgb_img[prediction_mask==color_idx] = crop_classes[color_idx]
+            
+            # color_img =  array_to_img(rgb_img)
+            # non_blank_predictions+=1
+            # # img_0_contrast = ImageOps.autocontrast(img_0)
+            # # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
+            # # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
+            # if np.ptp(rgb_img):
+            #     filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+            #     # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
+            #     color_img.save(filename_0)
+            #         # img_0_contrast.save(filename_0.replace(".tif", ".png"))
+            #         # img_1.save(filename_1)
     print(f"Total non-blank predictions saved: {non_blank_predictions} out of {model_batch_size*len(predictions)} predictions")
 
 

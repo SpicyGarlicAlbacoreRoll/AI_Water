@@ -37,15 +37,14 @@ def valid_mask(frame_name, mask_dict) -> bool:
     frequency_dict = find_frequencies(class_dict, unique_classes, image_size)
     
    
-    if frequency_dict.get("6") == None:
+    if frequency_dict.get("0") == None:
         return True
 
-    # ignore cropmask files that are primarily filled over half with 6 (background, qgis no-data value)
-    if frequency_dict.get("6") > 0.5:
-        # print(frame_name)
-        return False
+    # ignore cropmask files that are primarily one class (background, qgis no-data value)
+    if frequency_dict.get("0") > 0.15 and frequency_dict.get("0") < 0.66:
+        return True
 
-    return True
+    return False
 
 def get_tiles(files: List) -> (Dict, List):
     frames = {}

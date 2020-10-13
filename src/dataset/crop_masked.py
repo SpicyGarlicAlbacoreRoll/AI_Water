@@ -51,10 +51,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     validation_split = 0.1
     split_index = floor(sample_size * validation_split)
 
-    batch_size = 1
+    batch_size = 16
     time_steps = TIME_STEPS
     sub_sampling = 1
-    n_classes = 7
+    n_classes = 2
 
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
@@ -65,7 +65,12 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     print(f"Base Validation Samples:\t{split_index}")
     print(f"\tTotal Validation Samples with random subsampling:\t{split_index} * {sub_sampling} = {sub_sampling*split_index}\n")
 
+    # image augmentation keys, so all images pull from same augmentation
+    # additional_targets = {}
+    # for idx in range(TIME_STEPS):
+    #     additional_targets[f"image{idx}"] = "image"
 
+    # print(additional_targets)
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
         HorizontalFlip(p=0.5),
@@ -91,7 +96,8 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
         subsampling=sub_sampling,
-        augmentations=AUGMENTATIONS_TRAIN)
+        augmentations=AUGMENTATIONS_TRAIN,
+        loops=4)
 
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
@@ -101,10 +107,12 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
-        output_channels=3,
+        output_channels=1,
         n_classes=n_classes,
         dataset_directory=dataset_dir(dataset),
-        shuffle=True,)
+        shuffle=True,
+        loops=4,
+        training = False)
 
     return train_iter, validation_iter
 
@@ -116,8 +124,8 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
     frame_keys, sample_size, time_steps = generate_frame_keys(test_metadata)
     time_steps = TIME_STEPS
     sub_sampling = 1
-    batch_size=1
-    n_classes=7
+    batch_size=16
+    n_classes=2
     test_iter = SARTimeseriesGenerator(
         test_metadata,
         time_series_frames=frame_keys,
@@ -126,7 +134,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
         time_steps=time_steps,
         n_channels=2,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
-        output_channels=3,
+        output_channels=1,
         subsampling=sub_sampling,
         dataset_directory=dataset_dir(dataset),
         n_classes=n_classes,

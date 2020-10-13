@@ -54,7 +54,7 @@ def train_model(
         if verbose > 0:
             print(f"Epoch {epoch}/{epochs}")
 
-        clear_session()
+        # clear_session()
         
         history = model.fit(
             x=training_set,

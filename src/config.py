@@ -4,5 +4,5 @@ PROJECT_DIR = os.path.split(os.path.dirname(os.path.abspath(__file__)))[0]
 DATASETS_DIR = os.path.join(PROJECT_DIR, 'datasets')
 MODELS_DIR = os.path.join(PROJECT_DIR, 'models')
 NETWORK_DEMS = 64
-TIME_STEPS = 3
-CROP_CLASSES = 7
+TIME_STEPS = 9
+CROP_CLASSES = 2

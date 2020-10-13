@@ -1,4 +1,7 @@
 from keras import backend as K
+from keras.metrics import MeanIoU
+import tensorflow as tf
+import numpy as np
 
 """Dice Coefficient Loss function based on Sørensen–Dice coefficient method.
 Performs well when there is an imbalance between classes in image segmnetation
@@ -71,3 +74,18 @@ def jaccard_distance_loss(y_true, y_pred, smooth=100):
     sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis=-1)
     jac = (intersection + smooth) / (sum_ - intersection + smooth)
     return (1 - jac) * smooth
+
+
+
+
+# def mean_iou(y_true, y_pred):
+#     prec = []
+#     for t in np.arange(0.5, 1.0, 0.05):
+#         x = y_pred[y_pred > t]
+#         y_pred_ = tf.cast(x, tf.int32)
+#         score, up_opt = MeanIoU(y_true, y_pred_, 2)
+#         K.get_session().run(tf.local_variables_initializer())
+#         with tf.control_dependencies([up_opt]):
+#             score = tf.identity(score)
+#         prec.append(score)
+#     return K.mean(K.stack(prec), axis=0)
