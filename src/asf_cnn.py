@@ -68,8 +68,8 @@ def train_model(
             model_history[key] += history.history[key]
 
         save_model(model, f"e{epoch + epoch_prev}", history=model_history)
-        if(epoch != epochs):
-            del history
+        # if(epoch != epochs):
+        #     del history
 
     save_model(model, 'latest')
 

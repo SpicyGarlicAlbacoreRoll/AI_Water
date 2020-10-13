@@ -114,7 +114,7 @@ def deconv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 16,
+    num_filters: int = 8,
     time_steps: int = TIME_STEPS,
     dropout: float = 0.5,
     batchnorm: bool = True
@@ -142,12 +142,12 @@ def create_cdl_model_masked(
     p3 = Dropout(dropout)(p3)
 
     # c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, depth=1, batchnorm=batchnorm)
-    c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
+    c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
     # p3 = MaxPooling3D((1, 2, 2))(c3)
     p4 = Dropout(dropout)(p4)
 
-    c5 = conv2d_block_time_dist(p3, num_filters * 16, kernel_size=3)
+    c5 = conv2d_block_time_dist(p4, num_filters * 16, kernel_size=3)
     # c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     # p4 =TimeDistributed( MaxPooling2D((2, 2)))(c4)
     # p4 = Dropout(dropout)(p4)
