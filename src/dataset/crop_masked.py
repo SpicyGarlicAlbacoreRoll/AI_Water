@@ -23,7 +23,7 @@ from albumentations import (
 
 from ..asf_typing import TimeseriesMetadataFrameKey
 from ..config import NETWORK_DEMS
-from ..config import TIME_STEPS
+from ..config import TIME_STEPS, N_CHANNELS
 from ..gdal_wrapper import gdal_open
 from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from .common import dataset_dir, valid_image
@@ -55,6 +55,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     time_steps = TIME_STEPS
     sub_sampling = 1
     n_classes = 2
+    loops=62
 
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
@@ -65,6 +66,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     print(f"Base Validation Samples:\t{split_index}")
     print(f"\tTotal Validation Samples with random subsampling:\t{split_index} * {sub_sampling} = {sub_sampling*split_index}\n")
 
+    print(f"\nTotal training samples with loops:\t {loops*(sample_size-split_index)}")
     # image augmentation keys, so all images pull from same augmentation
     # additional_targets = {}
     # for idx in range(TIME_STEPS):
@@ -74,13 +76,13 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
         HorizontalFlip(p=0.5),
-        RandomContrast(limit=0.2, p=0.5),
-        RandomGamma(gamma_limit=(80, 120), p=0.5),
-        RandomBrightness(limit=0.2, p=0.5),
+        RandomContrast(limit=0.2, p=0.9),
+        RandomGamma(gamma_limit=(80, 120), p=0.9),
+        RandomBrightness(limit=0.2, p=0.9),
         # CLAHE(p=1.0, clip_limit=2.0),
         ShiftScaleRotate(
             shift_limit=0.0625, scale_limit=0.1, 
-            rotate_limit=15, border_mode=cv2.BORDER_REFLECT_101, p=0.8),
+            rotate_limit=15, border_mode=cv2.BORDER_REFLECT_101, p=0.9),
     ])
 
     train_iter = SARTimeseriesGenerator(
@@ -89,7 +91,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         batch_size=batch_size,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
-        n_channels=2,
+        n_channels=N_CHANNELS,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=3,
         n_classes=n_classes,
@@ -97,7 +99,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         shuffle=True,
         subsampling=sub_sampling,
         augmentations=AUGMENTATIONS_TRAIN,
-        loops=4)
+        loops=loops)
 
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
@@ -105,13 +107,13 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         batch_size=batch_size,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
-        n_channels=2,
+        n_channels=N_CHANNELS,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
         n_classes=n_classes,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
-        loops=4,
+        loops=1,
         training = False)
 
     return train_iter, validation_iter
@@ -132,7 +134,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
         batch_size=batch_size,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
         time_steps=time_steps,
-        n_channels=2,
+        n_channels=N_CHANNELS,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
         subsampling=sub_sampling,

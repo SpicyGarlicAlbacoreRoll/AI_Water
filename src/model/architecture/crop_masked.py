@@ -13,7 +13,7 @@ from keras.losses import BinaryCrossentropy, SparseCategoricalCrossentropy, Cate
 from keras.metrics import MeanIoU
 import tensorflow as tf
 from src.config import NETWORK_DEMS as dems
-from src.config import TIME_STEPS, CROP_CLASSES
+from src.config import TIME_STEPS, CROP_CLASSES, N_CHANNELS
 from src.model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss, jaccard_distance_loss
 
 def class_weighted_pixelwise_crossentropy(target, output):
@@ -118,13 +118,13 @@ def create_cdl_model_masked(
     model_name: str,
     num_filters: int = 8,
     time_steps: int = TIME_STEPS,
-    dropout: float = 0.5,
+    dropout: float = 0.7,
     batchnorm: bool = True
 ) -> Model:
     """ Function to define the Time Distributed UNET Model """
 
     """Requires stack of Sequential SAR data (with vh vv channels stacked), where each image is a different timestep"""
-    inputs = Input(shape=(time_steps, dems, dems, 2), batch_size=None)
+    inputs = Input(shape=(time_steps, dems, dems, N_CHANNELS), batch_size=None)
     c1 = conv2d_block(
         inputs, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
@@ -144,12 +144,13 @@ def create_cdl_model_masked(
     p3 = Dropout(dropout)(p3)
 
     # c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, depth=1, batchnorm=batchnorm)
-    c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
-    # p3 = MaxPooling3D((1, 2, 2))(c3)
-    p4 = Dropout(dropout)(p4)
+    # c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
+    # p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
+    # # p3 = MaxPooling3D((1, 2, 2))(c3)
+    # p4 = Dropout(dropout)(p4)
 
-    c5 = conv2d_block_time_dist(p4, num_filters * 16, kernel_size=3)
+    # c5 = conv2d_block_time_dist(p3, num_filters * 16, kernel_size=3)
+    c5 = conv2d_block(p3, num_filters * 8, kernel_size=3)
     # c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     # p4 =TimeDistributed( MaxPooling2D((2, 2)))(c4)
     # p4 = Dropout(dropout)(p4)
@@ -163,10 +164,10 @@ def create_cdl_model_masked(
     # clstmNormalized = TimeDistributed(BatchNormalization())(clstmBlock)
 
     # Expanding dims
-    u1 = deconv2d_block_time_dist(c5, num_filters=num_filters * 16, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
-    u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
-    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
-    u4 = deconv2d_block_time_dist(u3, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
+    u1 = deconv2d_block_time_dist(c5, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
+    u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
+    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 1, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
+    # u4 = deconv2d_block_time_dist(u3, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
     # c9 = deconv2d_block_time_dist(c8, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2)
     # c10 = deconv2d_block_time_dist(c9, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, return_last_sequence=False)
     
@@ -238,7 +239,7 @@ def create_cdl_model_masked(
     # final_lstm = LSTM(2*64*64*1)(flattened)
     # final_conv = Conv3D(1, 1, padding='same', activation="sigmoid")(c8)
     # final_conv = TimeDistributed(Conv2D(1, 1, activation='sigmoid'))(c8)
-    final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(u4)
+    final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(u3)
     # output_shape=28*128*4
     # final_layer = Reshape((-1))(final_conv)
     # clstmBlock_2 = Bidirectional(clstmForwards_2, merge_mode="sum")(c13)
