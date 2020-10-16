@@ -23,7 +23,7 @@ from albumentations import (
 
 from ..asf_typing import TimeseriesMetadataFrameKey
 from ..config import NETWORK_DEMS
-from ..config import TIME_STEPS, N_CHANNELS
+from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY
 from ..gdal_wrapper import gdal_open
 from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from .common import dataset_dir, valid_image
@@ -51,11 +51,12 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     validation_split = 0.1
     split_index = floor(sample_size * validation_split)
 
-    batch_size = 16
+    batch_size = 32
     time_steps = TIME_STEPS
     sub_sampling = 1
     n_classes = 2
-    loops=62
+    loops=TRAINING_LOOPS
+    training_p = AUGMENTATION_PROBABILITY
 
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
@@ -75,14 +76,14 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     # print(additional_targets)
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
-        HorizontalFlip(p=0.5),
-        RandomContrast(limit=0.2, p=0.9),
-        RandomGamma(gamma_limit=(80, 120), p=0.9),
-        RandomBrightness(limit=0.2, p=0.9),
+        HorizontalFlip(p=training_p),
+        RandomContrast(limit=0.2, p=training_p),
+        RandomGamma(gamma_limit=(80, 120), p=training_p),
+        RandomBrightness(limit=0.2, p=training_p),
         # CLAHE(p=1.0, clip_limit=2.0),
         ShiftScaleRotate(
             shift_limit=0.0625, scale_limit=0.1, 
-            rotate_limit=15, border_mode=cv2.BORDER_REFLECT_101, p=0.9),
+            rotate_limit=15, border_mode=cv2.BORDER_REFLECT_101, p=training_p),
     ])
 
     train_iter = SARTimeseriesGenerator(

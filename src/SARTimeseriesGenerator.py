@@ -98,9 +98,9 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         y = []
 
         if self.n_classes > 2:
-            y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, self.n_classes), dtype=np.uint8)
+            y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, self.n_classes), dtype=np.float32)
         else:
-            y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 1), dtype=np.uint8)
+            y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 1), dtype=np.float32)
         #frame numbers are in the "ulx_0_uly_0" format
         last_valid = []
         last_mask = []
@@ -181,7 +181,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 except FileNotFoundError:
                     continue
 
-                mask_array = np.array(mask).astype('uint8')
+                mask_array = np.array(mask).astype('float32')
                 one_hot = self.__to_one_hot(mask_array, self.n_classes)
                 x_stack_augmented = []
 

@@ -172,73 +172,7 @@ def create_cdl_model_masked(
     # c10 = deconv2d_block_time_dist(c9, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, return_last_sequence=False)
     
     
-    
-    
-    # u6 = UpSampling3D(
-    #     size=(1, 2, 2)
-    # )(c4)
 
-    # u6 = concatenate([u6, c3])
-    # u6 = Dropout(dropout)(u6)
-    # c6 = conv2d_block(u6, num_filters * 8, kernel_size=3, depth=1, activation=False, batchnorm=batchnorm)
-
-    # u7 = UpSampling3D(
-    #     size=(2, 2, 2)
-    # )(c6)
-
-    # u7 = concatenate([u7, c2])
-    # u7 = Dropout(dropout)(u7)
-    # c7 = conv2d_block(u7, num_filters * 4, kernel_size=3, depth=1, activation=False, batchnorm=batchnorm)
-
-
-    # u8 = UpSampling3D(
-    #     size=(2, 2, 2)
-    # )(c7)
-
-    # u8 = concatenate([u8, c1])
-    # u8 = Dropout(dropout)(u8)
-    # c8 = conv2d_block(u8, num_filters * 2, kernel_size=3, depth=1, activation=False, batchnorm=batchnorm)  
-    
-
-
-
-
-    # final_upsample = TimeDistributed(UpSampling2D(
-    #     size=(2, 2)
-    # ))(c8)
-    # fdropout = Dropout(dropout)(final_upsample)
-    # fconv = conv2d_block(fdropout, num_filters * 2, kernel_size=3, batchnorm=batchnorm)  
-    # u11 = concatenate([u11, c3])
-    # u11 = Dropout(dropout)(u11)
-    # c11 = conv2d_block_time_dist(u11, num_filters * 1, kernel_size=3, batchnorm=batchnorm)
-    # u12 = TimeDistributed(Conv2DTranspose(
-    #     num_filters * 1, (3, 3), strides=(2, 2), padding='same'
-    # ))(c11)
-    # u12 = concatenate([u12, c2])
-    # u12 = Dropout(dropout)(u12)
-    # c12 = conv2d_block_time_dist(u12, num_filters * 1, kernel_size=3, batchnorm=batchnorm)
-    # u13 = TimeDistributed(Conv2DTranspose(
-    #     num_filters * 1, (3, 3), strides=(2, 2), padding='same'
-    # ))(c12)
-    # u13 = concatenate([u13, c1])
-    # u13 = Dropout(dropout)(u13)
-    # c13 = conv2d_block_time_dist(
-    #     u13, num_filters * 1, kernel_size=3, batchnorm=batchnorm
-    # )
-    # final_max_pool = GlobalAveragePooling3D()(c13)
-    # reshaped = Reshape((64, 64, 1))(final_max_pool)
-    # final_layer = Conv2D(1, 1, activation='sigmoid')(reshaped)
-    # final_conv = TimeDistributed(Conv2D(1, 1))(c13)
-    # clstmForwards_2 = ConvLSTM2D(num_filters, kernel_size=3, padding='same', kernel_initializer = 'he_normal', return_sequences=False, name="clstmForwards_2")(c10)
-    # final_conv_1 = Conv2D(num_filters, 3, padding = 'same', kernel_initializer = 'he_normal')(clstmForwards_2)
-    # final_conv_2 = Conv2D(2, 3, padding = 'same', kernel_initializer = 'he_normal')(final_conv_1)
-    # final_max_pool = MaxPooling3D((4, 1, 1))(c8)
-    # final_layer = Reshape((1, 64, 64, 1))(final_max_pool)
-
-    # flattened = TimeDistributed(Flatten())(c4)
-    # final_lstm = LSTM(2*64*64*1)(flattened)
-    # final_conv = Conv3D(1, 1, padding='same', activation="sigmoid")(c8)
-    # final_conv = TimeDistributed(Conv2D(1, 1, activation='sigmoid'))(c8)
     final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(u3)
     # output_shape=28*128*4
     # final_layer = Reshape((-1))(final_conv)
@@ -253,7 +187,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=['accuracy' ]
+        loss=BinaryCrossentropy(from_logits=True), optimizer=Adam(lr=1e-3), metrics=['accuracy' ]
     )
 
     return model
