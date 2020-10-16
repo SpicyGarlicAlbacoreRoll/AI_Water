@@ -250,7 +250,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             middle = vh_vv_pairs[one_third:2*one_third]
             end = vh_vv_pairs[2*one_third:]
 
-            if self.time_steps > 2:
+            if self.time_steps > 2 and self.time_steps < len(vh_vv_pairs):
                 # favor picking more time steps from the middle of the stack if timesteps can't be evenly distributed across
                 one_third_time_steps = self.time_steps // 3
                 middle_third_time_steps = self.time_steps - 2 * one_third_time_steps
