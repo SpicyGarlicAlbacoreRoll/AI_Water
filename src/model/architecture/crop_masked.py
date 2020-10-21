@@ -118,7 +118,7 @@ def create_cdl_model_masked(
     model_name: str,
     num_filters: int = 8,
     time_steps: int = TIME_STEPS,
-    dropout: float = 0.7,
+    dropout: float = 0.5,
     batchnorm: bool = True
 ) -> Model:
     """ Function to define the Time Distributed UNET Model """
@@ -187,7 +187,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss=BinaryCrossentropy(from_logits=True), optimizer=Adam(lr=1e-3), metrics=['accuracy' ]
+        loss="mean_squared_error", optimizer=Adam(lr=1e-3), metrics=['accuracy' ]
     )
 
     return model

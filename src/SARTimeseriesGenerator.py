@@ -84,15 +84,12 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
 
     def __data_generation(self, frame_data_temp):
-        # if not self.training:
-        #     self.__setBatchMetadata(frame_data_temp)
         if len(frame_data_temp) == 0:
             print("FRAME DATA EMPTY")
 
-        # batch_metadata = []
         sample_metadata = []
         stride = len(frame_data_temp)
-        # self.time_steps = 2
+
         # (samples, timesteps, width, height, channels)
         X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
         y = []
@@ -101,51 +98,27 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, self.n_classes), dtype=np.float32)
         else:
             y = np.zeros((self.batch_size * self.subsampling, *self.output_dim, 1), dtype=np.float32)
+
         #frame numbers are in the "ulx_0_uly_0" format
         last_valid = []
         last_mask = []
         for subsample in range(self.subsampling):
-            for sample_idx, (subset_sample, frame_number) in enumerate(frame_data_temp):
+            for sample_idx, (sample_subset_prefix, frame_number) in enumerate(frame_data_temp):
                 time_series_stack = []
                 time_series_mask = []
 
-                random_selection = self.__random_frame_sample(self.list_IDs[subset_sample][frame_number])
+                random_selection = self.__random_frame_sample(self.list_IDs[sample_subset_prefix][frame_number])
                 if not self.training:
                     sample_metadata.append(random_selection)
 
                 for tileVH, tileVV in random_selection:
-                    try:
-                        with gdal_open(os.path.join(self.dataset_directory,tileVH)) as f:
-                            vh = f.ReadAsArray()
-                    except FileNotFoundError:
-                        continue
-                    try:
-                        with gdal_open(os.path.join(self.dataset_directory,tileVV)) as f:
-                            vv = f.ReadAsArray()
-                    except FileNotFoundError:
-                        continue
-                    
-                    tile_array = []
-                    if self.n_channels == 2:
-                        tile_array = np.stack((vh, vv), axis=2).astype('float32')
-                    else:
-                        vh = np.array(vh).astype('float32').reshape(*self.dim, self.n_channels)
-                        vv = np.array(vv).astype('float32').reshape(*self.dim, self.n_channels)
+                    vh, vv = self.__load_vh_vv(tileVH, tileVV)
+                    tile_array = self.__create_sample_timestep(vh, vv)
 
-                        if np.ptp(vh) > np.ptp(vv):
-                            tile_array = vh
-                        else:
-                            tile_array = vv
-
-                        # tile_array = np.stack((vh, vv), axis=2).astype('float32')
-                    if np.ptp(tile_array) == 0:
-                        tile_array = np.ones(shape=(*self.dim, self.n_channels)).astype('float32')
-                    else:
-                        tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
                     if self.clip_range:
                         min_, max_ = self.clip_range
                         np.clip(X, min_, max_, out=X)
-                    # print(np.ptp(tile_array))
+
                     time_series_stack.append(tile_array)
 
                 # if we end up with a stack with less than the set amount of timesteps, 
@@ -166,59 +139,29 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 #convert list of vv vh composites to numpy array
                 x_stack = np.stack(time_series_stack, axis=0)
 
-                # get corresponding mask prefix (ie: CA_2019, and grab the corresponding mask file)
-                subset_name = f"{'_'.join(subset_sample.split('_')[:-1])}"
-                subset_mask_dir_name = f"{subset_name}_masks"
-                file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
-                mask = 0
-                try:
-                    if self.training:
-                        with gdal_open(os.path.join(self.dataset_directory, "train", subset_mask_dir_name, file_name)) as f:
-                            mask = f.ReadAsArray()
-                    else:
-                        with gdal_open(os.path.join(self.dataset_directory, "test", subset_mask_dir_name, file_name)) as f:
-                            mask = f.ReadAsArray()
-                except FileNotFoundError:
-                    continue
-
-                mask_array = np.array(mask).astype('float32')
+                mask_array = self.__get_mask(sample_subset_prefix, frame_number)
                 one_hot = self.__to_one_hot(mask_array, self.n_classes)
-                x_stack_augmented = []
 
+                # Augment data
                 augmentation_input = {}
 
-                
+                # create keys to retrive augmented images from dictionary
                 if self.training:
-                    for img_idx, img in enumerate(x_stack):
-                        augmentation_input[f"image{img_idx}"] = img
-                    # print(self.augment)
-                    aug_output = self.augment(image=x_stack[0], **augmentation_input, mask=one_hot)
-                    x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(x_stack))])
-                    one_hot = aug_output["mask"]
-                    # x_stack_augmented = np.stack([self.augment(image=img, mask=one_hot)[f"image{img_idx}"] for img_idx, img in enumerate(x_stack)])
-                    # x_stack_augmented = np.stack(self.augment(image0=x_stack[0], ))
+                    x_stack, one_hot = self.__augment_training_data(x_stack, one_hot)
                 else:
-                    x_stack_augmented = x_stack
-                
-                # one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
-                # for i, unique_value in enumerate(np.unique(mask_array)):
-                #     one_hot[:, :, i][mask_array == unique_value] = 1
+                    x_stack = x_stack
 
+                # if the mask only contains a single class, swap it with the last valid time stack and mask
                 if np.ptp(x_stack) == 0.0 and last_valid != []:
                     # print("set 0 to last valid")
-                    x_stack_augmented = last_valid
+                    x_stack = last_valid
                     one_hot = last_mask
                 elif np.ptp(x_stack) != 0.0:
-                    last_valid = x_stack_augmented
+                    last_valid = x_stack
                     last_mask = one_hot
 
-                X[sample_idx + subsample*stride,] = x_stack_augmented
+                X[sample_idx + subsample*stride,] = x_stack
                 y[sample_idx + subsample*stride,] = one_hot
-
-                    
-                    # X = np.stack([self.augment(image=x)["image"] for x in X], axis=0)
-        # return np.nan_to_num(X, nan=-1, copy=False), keras.utils.to_categorical(np.nan_to_num(y, nan=-1, copy=False), self.n_classes)
-        # print(np.ptp(X), "\t", np.ptp(y))
 
         #keep track of testing data
         if not self.training:
@@ -227,6 +170,80 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
 
     # Non-keras.utils.Sequence functions
+    def __augment_training_data(self, sample_stack, mask):
+        augmentation_input = {}
+
+        for img_idx, img in enumerate(sample_stack):
+            augmentation_input[f"image{img_idx}"] = img
+
+        aug_output = self.augment(image=sample_stack[0], **augmentation_input, mask=mask)
+
+        x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(sample_stack))])
+        mask_augmented = aug_output["mask"]
+
+        return x_stack_augmented, mask_augmented
+
+    # loads vh and vv tifs from dataset relative filepath (ie: test/WA_2018/S1A_VH_ulx_0_uly_0.tif)
+    def __load_vh_vv(self, vh_dataset_path:str, vv_dataset_path: str):
+        try:
+            with gdal_open(os.path.join(self.dataset_directory,vh_dataset_path)) as f:
+                vh = f.ReadAsArray()
+        except FileNotFoundError:
+            print(f"Missing file {os.path.join(self.dataset_directory,vh_dataset_path)}")
+            # continue
+        try:
+            with gdal_open(os.path.join(self.dataset_directory,vv_dataset_path)) as f:
+                vv = f.ReadAsArray()
+        except FileNotFoundError:
+            print(f"Missing file {os.path.join(self.dataset_directory,vv_dataset_path)}")
+            # continue
+
+        return vh, vv
+    
+    # Takes vh and vv arrays and either stacks them if input_channels = 2, or uses the one with a wider value range if input_channels = 1
+    def __create_sample_timestep(self, vh, vv):
+        tile_array = []
+        if self.n_channels == 2:
+            tile_array = np.stack((vh, vv), axis=2).astype('float32')
+        else:
+            vh = np.array(vh).astype('float32').reshape(*self.dim, self.n_channels)
+            vv = np.array(vv).astype('float32').reshape(*self.dim, self.n_channels)
+
+            if np.ptp(vh) > np.ptp(vv):
+                tile_array = vh
+            else:
+                tile_array = vv
+
+            # tile_array = np.stack((vh, vv), axis=2).astype('float32')
+        if np.ptp(tile_array) == 0:
+            tile_array = np.ones(shape=(*self.dim, self.n_channels)).astype('float32')
+        else:
+            tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
+        
+        return tile_array
+    
+    # given the prefix and frame index
+    def __get_mask(self, sample_subset_prefix: str, frame_number):
+        # get corresponding mask prefix (ie: CA_2019, and grab the corresponding mask file)
+        subset_name = f"{'_'.join(sample_subset_prefix.split('_')[:-1])}"
+        subset_mask_dir_name = f"{subset_name}_masks"
+        file_name = f"CDL_{subset_name}_mask_{frame_number}.tif"
+        mask_path = ""
+        if self.training:
+            mask_path = os.path.join(self.dataset_directory, "train", subset_mask_dir_name, file_name)
+        else: 
+            mask_path = os.path.join(self.dataset_directory, "test", subset_mask_dir_name, file_name)
+
+        try:
+            with gdal_open(mask_path) as f:
+                mask = f.ReadAsArray()
+                return np.array(mask).astype('float32')
+                
+        except FileNotFoundError:
+            print(f"Mask {mask_path} missing")
+
+        return np.zeros(*self.output_dim, self.output_channels).astype('float32')
+        
 
     # Encodes the time series mask, an image array of shape (dim, dim, 1), into a one-hot encoding form for Categorical CrossEntropy loss with softmax activation.
     # Each unique pixel value represents a category, and the amount of unique pixel values should = the number of categories, including the background
@@ -243,23 +260,21 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __random_frame_sample(self, vh_vv_pairs: List):
         random_selection = []
-        if len(vh_vv_pairs) >= 6:
+        if len(vh_vv_pairs) >= 6:and self.time_steps > 2 and self.time_steps < len(vh_vv_pairs):
             # to ensure we get a good sample of a beginning middle and end
             one_third = len(vh_vv_pairs)//3
             beginning = vh_vv_pairs[:one_third]
             middle = vh_vv_pairs[one_third:2*one_third]
             end = vh_vv_pairs[2*one_third:]
 
-            if self.time_steps > 2 and self.time_steps < len(vh_vv_pairs):
-                # favor picking more time steps from the middle of the stack if timesteps can't be evenly distributed across
-                one_third_time_steps = self.time_steps // 3
-                middle_third_time_steps = self.time_steps - 2 * one_third_time_steps
+            # favor picking more time steps from the middle of the stack if timesteps can't be evenly distributed across
+            one_third_time_steps = self.time_steps // 3
+            middle_third_time_steps = self.time_steps - 2 * one_third_time_steps
 
-                random_selection.extend(random.sample(beginning, one_third_time_steps))
-                random_selection.extend(random.sample(middle, middle_third_time_steps))
-                random_selection.extend(random.sample(end, one_third_time_steps))
-            else:
-                random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
+            random_selection.extend(random.sample(beginning, one_third_time_steps))
+            random_selection.extend(random.sample(middle, middle_third_time_steps))
+            random_selection.extend(random.sample(end, one_third_time_steps))
+
         else:
             random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
         

@@ -94,16 +94,16 @@ def test_wrapper(args: Namespace) -> None:
             timeseries_sample = {}
             # for timestep in sample
             sample_timesteps = []
-            if idx ==0:
-                print(sample)
+            # if idy ==0:
+                # print(sample)
             # for sub_dataset, frame_index  in sample:
                 
                 # for vh, vv in timeseries:
                 # vh_vv_pair = {"vh": vh, "vv": vv}
-            sample_timesteps = input_metadata[sample[0]][sample[1]]
+            # sample_timesteps = sample
             # sample_timesteps = sub_dataset
             # timeseries_mask_pair["mask"] = sample[1]
-            timeseries_sample["timesteps"] = sample_timesteps
+            timeseries_sample["timesteps"] = sample
             # The name of the prediction produced by this sample
 
             # prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
