@@ -10,6 +10,7 @@ from keras.layers.pooling import MaxPooling2D, MaxPooling3D, GlobalAveragePoolin
 from keras.models import Model
 from keras.optimizers import Adam, SGD, RMSprop
 from keras.losses import BinaryCrossentropy, SparseCategoricalCrossentropy, CategoricalCrossentropy
+from keras.optimizers.schedules import ExponentialDecay
 from keras.metrics import MeanIoU
 import tensorflow as tf
 from src.config import NETWORK_DEMS as dems
@@ -166,28 +167,30 @@ def create_cdl_model_masked(
     # Expanding dims
     u1 = deconv2d_block_time_dist(c5, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
     u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
-    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 1, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
+    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
     # u4 = deconv2d_block_time_dist(u3, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
     # c9 = deconv2d_block_time_dist(c8, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2)
     # c10 = deconv2d_block_time_dist(c9, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, return_last_sequence=False)
     
     
 
-    final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(u3)
+    final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)
+    forward_and_back = Bidirectional(final_conv)(u3)
     # output_shape=28*128*4
     # final_layer = Reshape((-1))(final_conv)
     # clstmBlock_2 = Bidirectional(clstmForwards_2, merge_mode="sum")(c13)
     # final_layer = BatchNormalization()(clstmForwards_2)
     # # final_conv = Conv2D(1, 1, activation='sigmoid')(final_layer)
     # final_dense = Dense(1)(final_conv)
-    model = Model(inputs=inputs, outputs=[final_conv])
+    model = Model(inputs=inputs, outputs=[forward_and_back])
 
     model.__asf_model_name = model_name
 
+    lr_schedule = ExponentialDecay(1e-3, decay_steps=100000, decay_rate=0.96, staircase=True)
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss="mean_squared_error", optimizer=Adam(lr=1e-3), metrics=['accuracy' ]
+        loss="mean_squared_error", optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
     )
 
     return model

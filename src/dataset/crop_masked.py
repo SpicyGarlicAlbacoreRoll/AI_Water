@@ -23,7 +23,7 @@ from albumentations import (
 
 from ..asf_typing import TimeseriesMetadataFrameKey
 from ..config import NETWORK_DEMS
-from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY, BATCH_SIZE
+from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY, BATCH_SIZE, MIN_TRAINING_SAMPLES
 from ..gdal_wrapper import gdal_open
 from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from .common import dataset_dir, valid_image
@@ -85,8 +85,8 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
         subsampling=sub_sampling,
-        augmentations=AUGMENTATIONS_TRAIN,
-        loops=loops)
+        min_samples=MIN_TRAINING_SAMPLES,
+        augmentations=AUGMENTATIONS_TRAIN)
 
     validation_iter = SARTimeseriesGenerator(
         train_metadata,
@@ -100,7 +100,6 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         n_classes=n_classes,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
-        loops=1,
         training = False)
 
     return train_iter, validation_iter

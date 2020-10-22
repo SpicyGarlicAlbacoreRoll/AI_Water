@@ -22,14 +22,18 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     def __init__(self, time_series_metadata: Dict, time_series_frames: List[TimeseriesMetadataFrameKey], batch_size=32, dim=(NETWORK_DEMS,NETWORK_DEMS), 
     time_steps=TIME_STEPS, n_channels=2, output_dim=(NETWORK_DEMS, NETWORK_DEMS), output_channels=1, 
     n_classes=7, shuffle=True, dataset_directory="", clip_range: Optional[Tuple[float, float]] = None, training = True, subsampling=1, augmentations=Compose([ToFloat(max_value=255, p=0.0),
-        ]), loops=1):
+        ]), min_samples=20000):
         self.class_mode = 'categorical'
         self.list_IDs = time_series_metadata
-        self.frame_data = []
-        for loop in range(loops):
-            self.frame_data.extend(time_series_frames)
+        self.frame_data = time_series_frames
+        
+        if training:
+            sample_count = len(time_series_frames)
+            self.frame_data.extend(random.sample(time_series_frames, min_samples - sample_count))
+            # for loop in range(loops):
+            #     self.frame_data.extend(time_series_frames)
         self.loop_idx = 0
-        self.loops = loops
+        # self.loops = loops
         # for loop in range(loops):
         #     self.list_IDs.extend(time_series_metadata)
 
@@ -260,7 +264,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __random_frame_sample(self, vh_vv_pairs: List):
         random_selection = []
-        if len(vh_vv_pairs) >= 6:and self.time_steps > 2 and self.time_steps < len(vh_vv_pairs):
+        if len(vh_vv_pairs) >= 6 and self.time_steps > 2 and self.time_steps < len(vh_vv_pairs):
             # to ensure we get a good sample of a beginning middle and end
             one_third = len(vh_vv_pairs)//3
             beginning = vh_vv_pairs[:one_third]
