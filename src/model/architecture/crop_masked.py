@@ -17,36 +17,6 @@ from src.config import NETWORK_DEMS as dems
 from src.config import TIME_STEPS, CROP_CLASSES, N_CHANNELS
 from src.model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss, jaccard_distance_loss
 
-def class_weighted_pixelwise_crossentropy(target, output):
-    output = tf.clip_by_value(output, 10e-8, 1.-10e-8)
-    weights = [0.8, 0.2]
-    return -tf.reduce_sum(target * weights * tf.math.log(output))
-
-def conv2d_block_time_dist(
-    input_tensor: Input,
-    num_filters: int,
-    kernel_size: int = 3,
-    batchnorm: bool = True,
-    
-) -> Layer:
-    """ Function to add 2 convolutional layers with the parameters
-    passed to it """
-    # first layer
-    convLSTM_layer = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)
-    x = Bidirectional(convLSTM_layer)(input_tensor)
-    if batchnorm:
-        x = TimeDistributed(BatchNormalization())(x)
-    x = TimeDistributed(Activation('relu'))(x)
-    # second layer
-
-    x = Bidirectional(convLSTM_layer)(x)
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(x)
-    if batchnorm:
-        x = TimeDistributed(BatchNormalization())(x)
-    x = TimeDistributed(Activation('relu'))(x)
-
-    return x
-
 """ Cropland Data Time Series version of U-net model used in masked.py """
 
 def conv2d_block(
@@ -59,19 +29,18 @@ def conv2d_block(
 ) -> Layer:
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
-    # first layer
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(input_tensor)
+    
+    # first conv layer
+    
     x = TimeDistributed(Conv2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same',))(input_tensor)
-    # x = Conv3D(filters=num_filters, kernel_size=(depth, kernel_size, kernel_size), padding='same')(input_tensor)
     if batchnorm:
         x = BatchNormalization()(x)
     if activation:
         x = Activation('relu')(x)
-    # second layer
 
-    # x = Conv3D(filters=num_filters, kernel_size=(depth, kernel_size, kernel_size), padding='same')(x)
+    # second conv layer
+
     x = TimeDistributed(Conv2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same',))(x)
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(x)
     if batchnorm:
         x = BatchNormalization()(x)
     if activation:
@@ -102,13 +71,6 @@ def deconv2d_block_time_dist(
     # ))(input_tensor)
     # x = TimeDistributed(Conv2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same',))(input_tensor)
     x = concatenate([x, concat_layer], axis=-1)
-    # x = Dropout(dropout)(x)
-    # x = Conv3D(filters=num_filters, kernel_size=(3, kernel_size, kernel_size), padding='same')(x)
-    # x = Conv3D(filters=num_filters, kernel_size=(3, kernel_size, kernel_size), padding='same')(x)
-    # x = TimeDistributed(Conv2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same',))(input_tensor)
-    # x = TimeDistributed(Conv2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same',))(input_tensor)
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=True)(x)
-    # x = ConvLSTM2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same', return_sequences=return_last_sequence)(x)
     x = conv2d_block(x, num_filters, kernel_size=3, batchnorm=batchnorm, activation=activation)
 
     return x
@@ -130,58 +92,28 @@ def create_cdl_model_masked(
         inputs, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
 
-    # p1 = MaxPooling3D((2, 2, 2))(c1)
     p1 = TimeDistributed(MaxPooling2D((2, 2)))(c1)
     p1 = Dropout(dropout)(p1)
 
     c2 = conv2d_block(p1, num_filters * 2, kernel_size=3, batchnorm=batchnorm)
     p2 = TimeDistributed(MaxPooling2D((2, 2)))(c2)
-    # p2 = MaxPooling3D((2, 2, 2))(c2)
     p2 = Dropout(dropout)(p2)
 
     c3 = conv2d_block(p2, num_filters * 4, kernel_size=3, batchnorm=batchnorm)
     p3 = TimeDistributed(MaxPooling2D((2, 2)))(c3)
-    # p3 = MaxPooling3D((1, 2, 2))(c3)
     p3 = Dropout(dropout)(p3)
 
-    # c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, depth=1, batchnorm=batchnorm)
-    # c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    # p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
-    # # p3 = MaxPooling3D((1, 2, 2))(c3)
-    # p4 = Dropout(dropout)(p4)
-
-    # c5 = conv2d_block_time_dist(p3, num_filters * 16, kernel_size=3)
     c5 = conv2d_block(p3, num_filters * 8, kernel_size=3)
-    # c4 = conv2d_block_time_dist(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    # p4 =TimeDistributed( MaxPooling2D((2, 2)))(c4)
-    # p4 = Dropout(dropout)(p4)
-
-    # c5 = conv2d_block_time_dist(p4, num_filters * 16, kernel_size=3, batchnorm=batchnorm)
-    # p5 =TimeDistributed( MaxPooling2D((2, 2)))(c5)
-    # p5 = Dropout(dropout)(p5)
-
-    # clstmForwards = ConvLSTM2D(num_filters * 16, kernel_size=3, padding='same', return_sequences=True)
-    # clstmBlock = Bidirectional(clstmForwards, merge_mode="sum")(p5)
-    # clstmNormalized = TimeDistributed(BatchNormalization())(clstmBlock)
 
     # Expanding dims
     u1 = deconv2d_block_time_dist(c5, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
     u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
     u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
-    # u4 = deconv2d_block_time_dist(u3, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
-    # c9 = deconv2d_block_time_dist(c8, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2)
-    # c10 = deconv2d_block_time_dist(c9, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, return_last_sequence=False)
     
-    
-
+    # classifier (forward-backwards convlstm)
     final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)
     forward_and_back = Bidirectional(final_conv)(u3)
-    # output_shape=28*128*4
-    # final_layer = Reshape((-1))(final_conv)
-    # clstmBlock_2 = Bidirectional(clstmForwards_2, merge_mode="sum")(c13)
-    # final_layer = BatchNormalization()(clstmForwards_2)
-    # # final_conv = Conv2D(1, 1, activation='sigmoid')(final_layer)
-    # final_dense = Dense(1)(final_conv)
+
     model = Model(inputs=inputs, outputs=[forward_and_back])
 
     model.__asf_model_name = model_name
@@ -190,8 +122,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss="mean_squared_error", optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
+        loss=jaccard_distance_loss, optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
     )
 
     return model
-    

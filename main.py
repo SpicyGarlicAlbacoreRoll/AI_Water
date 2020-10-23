@@ -17,9 +17,11 @@ from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
 from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
 from src.config import NETWORK_DEMS
+from src.model.architecture.dice_loss import jaccard_distance_loss
 from PIL import Image, ImageOps
 from keras.optimizers import Adam
 from keras.metrics import MeanIoU
+from keras.losses import BinaryCrossentropy
 from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient
 # from src.plots import edit_predictions, plot_predictions
 
@@ -36,7 +38,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss='mean_squared_error', optimizer=Adam(), metrics=['accuracy']
+            loss=jaccard_distance_loss, optimizer=Adam(), metrics=['accuracy']
         )
         model.set_weights(weights)
     #     model.compile(
