@@ -83,7 +83,7 @@ def deconv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 10,
+    num_filters: int = 32,
     time_steps: int = TIME_STEPS,
     dropout: float = 0.5,
     batchnorm: bool = True
@@ -108,22 +108,26 @@ def create_cdl_model_masked(
     p3 = Dropout(dropout)(p3)
 
 
-    c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
-    p4 = Dropout(dropout)(p4)
-
-    c5 = conv2d_block(p4, num_filters * 16, kernel_size=3)
+    # c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
+    # p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
+    # p4 = Dropout(dropout)(p4)
+    middle_clstm = ConvLSTM2D(filters=num_filters * 4, kernel_size=3, activation="tanh", padding='same', return_sequences=True)
+    middle_bidirection = Bidirectional(middle_clstm)(p3)
+    # c5 = conv2d_block(p3, num_filters * 16, kernel_size=3)
 
     # Expanding dims
-    u = deconv2d_block_time_dist(c5, num_filters=num_filters * 16, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
-    u1 = deconv2d_block_time_dist(u, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
-    u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
-    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 2, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
+    # u = deconv2d_block_time_dist(c5, num_filters=num_filters * 16, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
+    u1 = deconv2d_block_time_dist(middle_bidirection, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
+    u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 2, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
+    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
     
     # classifier (forward-backwards convlstm)
-    # final_conv = ConvLSTM2D(filters=num_filters * 4, kernel_size=1, activation="relu", padding='same', return_sequences=True)
-    # forward_and_back = Bidirectional(final_conv)(u3)
-    final = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(u3)
+    final_conv_forward = ConvLSTM2D(filters=num_filters, kernel_size=3, activation="tanh", padding='same', return_sequences=False)
+    # final_conv_backwards = ConvLSTM2D(filters=num_filters, kernel_size=3, activation="tanh", padding='same', return_sequences=False)
+    final_bidirectional = Bidirectional(final_conv_forward)(u3)
+
+    final = Conv2D(filters=1, kernel_size=1,  activation="sigmoid", padding='same')(final_bidirectional)
+    # final = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(final_bidirecitonal)
 
     model = Model(inputs=inputs, outputs=[final])
 

@@ -238,7 +238,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         except FileNotFoundError:
             print(f"Mask {mask_path} missing")
 
-        return np.zeros(*self.output_dim, self.output_channels).astype('float32')
+        return np.zeros((*self.output_dim, self.output_channels)).astype('float32')
         
 
     # Encodes the time series mask, an image array of shape (dim, dim, 1), into a one-hot encoding form for Categorical CrossEntropy loss with softmax activation.
@@ -251,7 +251,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             for i, unique_value in enumerate(np.unique(mask_array)):
                 one_hot[:, :, i][mask_array == unique_value] = 1
         else:
-            one_hot = mask_array.reshape(*self.output_dim, 1)
+            one_hot = mask_array.reshape(*self.output_dim, 1) #[:, :, 0].reshape(*self.output_dim, 1)
         return one_hot
 
     def __random_frame_sample(self, vh_vv_pairs: List):
@@ -273,7 +273,8 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         elif len(vh_vv_pairs) >= 3 and self.time_steps < len(vh_vv_pairs):
             # if we have a short enough sample, just use first, some arbritary selection of the middle, and the final frame
             random_selection = [vh_vv_pairs[0]]
-            random_selection.extend(random.sample(self.timesteps - 2, vh_vv_pairs[:-1]))
+            middle = vh_vv_pairs[1:-1]
+            random_selection.extend(random.sample(middle, self.time_steps - 2))
             random_selection.append(vh_vv_pairs[-1])
         else:
             random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
