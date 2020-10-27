@@ -27,15 +27,8 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         self.list_IDs = time_series_metadata
         self.frame_data = time_series_frames
         
-        if training:
-            sample_count = len(time_series_frames)
+        if training and (sample_count := len(time_series_frames)) < min_samples:
             self.frame_data.extend(random.sample(time_series_frames, min_samples - sample_count))
-            # for loop in range(loops):
-            #     self.frame_data.extend(time_series_frames)
-        self.loop_idx = 0
-        # self.loops = loops
-        # for loop in range(loops):
-        #     self.list_IDs.extend(time_series_metadata)
 
         self.dataset_directory = dataset_directory
         self.batch_size = batch_size
@@ -72,7 +65,6 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         # get indices in current batch
-        # loop_offset = len(self.frame_data) * self.loop_idx
         indexes = self.indexes[index*self.batch_size : (index+1) * self.batch_size]
         # indexes = self.index
         # get list of IDs
@@ -278,7 +270,11 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             random_selection.extend(random.sample(beginning, one_third_time_steps))
             random_selection.extend(random.sample(middle, middle_third_time_steps))
             random_selection.extend(random.sample(end, one_third_time_steps))
-
+        elif len(vh_vv_pairs) >= 3 and self.time_steps < len(vh_vv_pairs):
+            # if we have a short enough sample, just use first, some arbritary selection of the middle, and the final frame
+            random_selection = [vh_vv_pairs[0]]
+            random_selection.extend(random.sample(self.timesteps - 2, vh_vv_pairs[:-1]))
+            random_selection.append(vh_vv_pairs[-1])
         else:
             random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
         

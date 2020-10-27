@@ -38,7 +38,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=jaccard_distance_loss, optimizer=Adam(), metrics=['accuracy']
+            loss="mean_squared_error", optimizer=Adam(lr=1e-5), metrics=['accuracy']
         )
         model.set_weights(weights)
     #     model.compile(
@@ -147,45 +147,46 @@ def test_wrapper(args: Namespace) -> None:
     for idy, image in enumerate(predictions):
         if idy % model_batch_size == 0 and idy != 0:        
             batch_index += 1
+        
+        for idz in range(image.shape[-1]):
+            images = np.array(image[:, :, idz].reshape(NETWORK_DEMS, NETWORK_DEMS, 1))
+            # for idz, frame in enumerate(range(temp.shape[0])):
+                # img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
+                # imgs = temp[idz, :, : :]
+                # for idx in range(temp.shape[-1]):
 
-        images = np.array(image.reshape(NETWORK_DEMS, NETWORK_DEMS, 1))
-        # for idz, frame in enumerate(range(temp.shape[0])):
-            # img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
-            # imgs = temp[idz, :, : :]
-            # for idx in range(temp.shape[-1]):
+                # for img in temp[idz, :, :, :]:
+                # for idx in 
+            # for channel_number in range(images.shape[-1]):
+            # rgb_img = np.zeros((NETWORK_DEMS, NETWORK_DEMS, 3)).astype(dtype=np.uint8)
+            img = images.reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8)
 
-            # for img in temp[idz, :, :, :]:
-            # for idx in 
-        # for channel_number in range(images.shape[-1]):
-        # rgb_img = np.zeros((NETWORK_DEMS, NETWORK_DEMS, 3)).astype(dtype=np.uint8)
-        img = images.reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8)
+            if np.ptp(img) != 0:
+                
+                # prediction_mask = []
 
-        if np.ptp(img) != 0:
+                # Assign class with max probability to a given pixel
+                # if img.shape[-1] > 1:
+                img_0 = array_to_img(img)
+                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+                img_0.save(filename_0)
+                non_blank_predictions+=1
+                # prediction_mask = img.argmax(axis=-1)
             
-            # prediction_mask = []
-
-            # Assign class with max probability to a given pixel
-            # if img.shape[-1] > 1:
-            img_0 = array_to_img(img)
-            filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
-            img_0.save(filename_0)
-            non_blank_predictions+=1
-            # prediction_mask = img.argmax(axis=-1)
-           
-            # for color_idx in range(len(crop_classes)):
-            #     rgb_img[prediction_mask==color_idx] = crop_classes[color_idx]
-            
-            # color_img =  array_to_img(rgb_img)
-            # non_blank_predictions+=1
-            # # img_0_contrast = ImageOps.autocontrast(img_0)
-            # # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
-            # # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-            # if np.ptp(rgb_img):
-            #     filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
-            #     # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
-            #     color_img.save(filename_0)
-            #         # img_0_contrast.save(filename_0.replace(".tif", ".png"))
-            #         # img_1.save(filename_1)
+                # for color_idx in range(len(crop_classes)):
+                #     rgb_img[prediction_mask==color_idx] = crop_classes[color_idx]
+                
+                # color_img =  array_to_img(rgb_img)
+                # non_blank_predictions+=1
+                # # img_0_contrast = ImageOps.autocontrast(img_0)
+                # # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
+                # # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
+                # if np.ptp(rgb_img):
+                #     filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+                #     # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
+                #     color_img.save(filename_0)
+                #         # img_0_contrast.save(filename_0.replace(".tif", ".png"))
+                #         # img_1.save(filename_1)
     print(f"Total non-blank predictions saved: {non_blank_predictions} out of {model_batch_size*len(predictions)} predictions")
 
 

@@ -112,7 +112,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
     frame_keys, sample_size, time_steps = generate_frame_keys(test_metadata)
     time_steps = TIME_STEPS
     sub_sampling = 1
-    batch_size=16
+    batch_size=BATCH_SIZE
     n_classes=2
     test_iter = SARTimeseriesGenerator(
         test_metadata,

@@ -1,21 +1,25 @@
 """
-    Contains the architecture for creating a cropland data layer within SAR images.
+    Contains the model architecture for predicting a cropland data layer within a time series of SAR images.
 """
-from tensorflow.python.framework.ops import disable_eager_execution
-from keras.layers import Activation, BatchNormalization, Dropout, Input, Layer, TimeDistributed, LSTM, Flatten, Dense, ConvLSTM2D, Reshape, AveragePooling3D, Conv3D, Bidirectional, UpSampling2D, UpSampling3D
+from keras.layers import (
+    Activation, BatchNormalization, Bidirectional, ConvLSTM2D, Dropout, Input,
+    Layer, Reshape, TimeDistributed, UpSampling2D
+)
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
-# from keras.layers.recurrent import 
 from keras.layers.merge import concatenate
-from keras.layers.pooling import MaxPooling2D, MaxPooling3D, GlobalAveragePooling3D
+from keras.layers.pooling import MaxPooling2D
+from keras.losses import (
+    BinaryCrossentropy, CategoricalCrossentropy, SparseCategoricalCrossentropy
+)
 from keras.models import Model
-from keras.optimizers import Adam, SGD, RMSprop
-from keras.losses import BinaryCrossentropy, SparseCategoricalCrossentropy, CategoricalCrossentropy
+from keras.optimizers import Adam
 from keras.optimizers.schedules import ExponentialDecay
-from keras.metrics import MeanIoU
-import tensorflow as tf
+from tensorflow.python.framework.ops import disable_eager_execution
+
+from src.config import CROP_CLASSES, N_CHANNELS
 from src.config import NETWORK_DEMS as dems
-from src.config import TIME_STEPS, CROP_CLASSES, N_CHANNELS
-from src.model.architecture.dice_loss import dice_coefficient, dice_coefficient_loss, jaccard_distance_loss
+from src.config import TIME_STEPS
+from src.model.architecture.dice_loss import jaccard_distance_loss, dice_coefficient_loss
 
 """ Cropland Data Time Series version of U-net model used in masked.py """
 
@@ -63,12 +67,12 @@ def deconv2d_block_time_dist(
 ) -> Layer:
     """ Function to add 2 convolutional layers with the parameters
     passed to it """
-    x = TimeDistributed(Conv2DTranspose(
-        num_filters * 1, (3, 3), strides=(2, 2), padding='same'
-    ))(input_tensor)
-    # x = TimeDistributed(UpSampling2D(
-    #     size=(2, 2)
+    # x = TimeDistributed(Conv2DTranspose(
+    #     num_filters * 1, (3, 3), strides=(2, 2), padding='same'
     # ))(input_tensor)
+    x = TimeDistributed(UpSampling2D(
+        size=(2, 2)
+    ))(input_tensor)
     # x = TimeDistributed(Conv2D(filters=num_filters, kernel_size=(kernel_size, kernel_size), padding='same',))(input_tensor)
     x = concatenate([x, concat_layer], axis=-1)
     x = conv2d_block(x, num_filters, kernel_size=3, batchnorm=batchnorm, activation=activation)
@@ -79,7 +83,7 @@ def deconv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 8,
+    num_filters: int = 10,
     time_steps: int = TIME_STEPS,
     dropout: float = 0.5,
     batchnorm: bool = True
@@ -103,18 +107,25 @@ def create_cdl_model_masked(
     p3 = TimeDistributed(MaxPooling2D((2, 2)))(c3)
     p3 = Dropout(dropout)(p3)
 
-    c5 = conv2d_block(p3, num_filters * 8, kernel_size=3)
+
+    c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
+    p4 = TimeDistributed(MaxPooling2D((2, 2)))(c4)
+    p4 = Dropout(dropout)(p4)
+
+    c5 = conv2d_block(p4, num_filters * 16, kernel_size=3)
 
     # Expanding dims
-    u1 = deconv2d_block_time_dist(c5, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
+    u = deconv2d_block_time_dist(c5, num_filters=num_filters * 16, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
+    u1 = deconv2d_block_time_dist(u, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
     u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
-    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
+    u3 = deconv2d_block_time_dist(u2, num_filters=num_filters * 2, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
     
     # classifier (forward-backwards convlstm)
-    final_conv = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)
-    forward_and_back = Bidirectional(final_conv)(u3)
+    # final_conv = ConvLSTM2D(filters=num_filters * 4, kernel_size=1, activation="relu", padding='same', return_sequences=True)
+    # forward_and_back = Bidirectional(final_conv)(u3)
+    final = ConvLSTM2D(filters=1, kernel_size=1, activation="sigmoid", padding='same', return_sequences=False)(u3)
 
-    model = Model(inputs=inputs, outputs=[forward_and_back])
+    model = Model(inputs=inputs, outputs=[final])
 
     model.__asf_model_name = model_name
 
@@ -122,7 +133,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss=jaccard_distance_loss, optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
+        loss="mean_squared_error", optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
     )
 
     return model
