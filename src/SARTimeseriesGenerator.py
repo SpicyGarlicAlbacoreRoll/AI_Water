@@ -87,7 +87,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         stride = len(frame_data_temp)
 
         # (samples, timesteps, width, height, channels)
-        X = np.zeros((self.batch_size * self.subsampling, self.time_steps, *self.dim, self.n_channels), dtype=np.float32)
+        X = np.zeros((self.batch_size * self.subsampling, *self.dim, self.n_channels * self.time_steps), dtype=np.float32)
         y = []
 
         if self.n_classes > 2:
@@ -100,14 +100,15 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         last_mask = []
         for subsample in range(self.subsampling):
             for sample_idx, (sample_subset_prefix, frame_number) in enumerate(frame_data_temp):
-                time_series_stack = []
+                time_series_stack = np.zeros((*self.dim, self.n_channels*self.time_steps), dtype=np.float32)
                 time_series_mask = []
+                time_step_idy = 0
 
                 random_selection = self.__random_frame_sample(self.list_IDs[sample_subset_prefix][frame_number])
                 if not self.training:
                     sample_metadata.append(random_selection)
 
-                for tileVH, tileVV in random_selection:
+                for timestep_idx, (tileVH, tileVV) in enumerate(random_selection):
                     vh, vv = self.__load_vh_vv(tileVH, tileVV)
                     tile_array = self.__create_sample_timestep(vh, vv)
 
@@ -115,7 +116,9 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         min_, max_ = self.clip_range
                         np.clip(X, min_, max_, out=X)
 
-                    time_series_stack.append(tile_array)
+                    time_series_stack[:,:,timestep_idx:timestep_idx+2] = tile_array
+                    time_step_idy += 2
+                    # time_series_stack.append(tile_array)
 
                 # if we end up with a stack with less than the set amount of timesteps, 
                 # append existing elements until we get enough timesteps
@@ -124,16 +127,17 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                     # Removing rows with missing values.
                     # Mark and learn missing values.
                     # Mask and learn without missing values.
-                if len(time_series_stack) < self.time_steps:
-                    idx = len(time_series_stack)
+                if time_step_idy < self.time_steps*self.n_channels:
+                    # idx = len(time_series_stack)
                     # pad out the sequence with the last time step if there aren't enough timesteps
-                    temp = time_series_stack[-1]
-                    while(idx != self.time_steps):
-                        time_series_stack.append(temp)
-                        idx+=1
+                    temp = time_series_stack[:,:,-2:]
+                    while(time_step_idy != self.time_steps*self.n_channels):
+                        time_series_stack[:,:,time_step_idy:time_step_idy+2] = temp
+                        time_step_idy += 2
 
                 #convert list of vv vh composites to numpy array
                 x_stack = np.stack(time_series_stack, axis=0)
+                # print(x_stack.shape)
 
                 mask_array = self.__get_mask(sample_subset_prefix, frame_number)
                 one_hot = self.__to_one_hot(mask_array, self.n_classes)
@@ -142,10 +146,10 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 augmentation_input = {}
 
                 # create keys to retrive augmented images from dictionary
-                if self.training:
-                    x_stack, one_hot = self.__augment_training_data(x_stack, one_hot)
-                else:
-                    x_stack = x_stack
+                # if self.training:
+                #     x_stack, one_hot = self.__augment_training_data(x_stack, one_hot)
+                # else:
+                #     x_stack = x_stack
 
                 # if the mask only contains a single class, swap it with the last valid time stack and mask
                 if np.ptp(x_stack) == 0.0 and last_valid != []:
@@ -173,7 +177,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             augmentation_input[f"image{img_idx}"] = img
 
         aug_output = self.augment(image=sample_stack[0], **augmentation_input, mask=mask)
-
+        print(len(sample_stack))
         x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(sample_stack))])
         mask_augmented = aug_output["mask"]
 
@@ -211,10 +215,10 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 tile_array = vv
 
             # tile_array = np.stack((vh, vv), axis=2).astype('float32')
-        if np.ptp(tile_array) == 0:
-            tile_array = np.ones(shape=(*self.dim, self.n_channels)).astype('float32')
-        else:
-            tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
+        # if np.ptp(tile_array) == 0:
+        #     tile_array = np.ones(shape=(*self.dim, self.n_channels)).astype('float32')
+        # else:
+        #     tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
         
         return tile_array
     
