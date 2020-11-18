@@ -38,7 +38,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss="mean_squared_error", optimizer=Adam(lr=1e-5), metrics=['accuracy']
+            loss="mean_squared_error", optimizer=Adam(lr=1e-3), metrics=['accuracy']
         )
         model.set_weights(weights)
     #     model.compile(
@@ -168,7 +168,7 @@ def test_wrapper(args: Namespace) -> None:
                 # Assign class with max probability to a given pixel
                 # if img.shape[-1] > 1:
                 img_0 = array_to_img(img)
-                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
+                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
                 img_0.save(filename_0)
                 non_blank_predictions+=1
                 # prediction_mask = img.argmax(axis=-1)
@@ -187,7 +187,7 @@ def test_wrapper(args: Namespace) -> None:
                 #     color_img.save(filename_0)
                 #         # img_0_contrast.save(filename_0.replace(".tif", ".png"))
                 #         # img_1.save(filename_1)
-    print(f"Total non-blank predictions saved: {non_blank_predictions} out of {model_batch_size*len(predictions)} predictions")
+    print(f"Total non-blank predictions saved: {non_blank_predictions} out of {len(predictions)} predictions")
 
 
 if __name__ == '__main__':

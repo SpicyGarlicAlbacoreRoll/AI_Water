@@ -272,7 +272,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             middle_third_time_steps = self.time_steps - 2 * one_third_time_steps
 
             random_selection.extend(random.sample(beginning, one_third_time_steps))
-            random_selection.extend(random.sample(middle, middle_third_time_steps))
+            random_selection.extend(random.sample(middle, min(middle_third_time_steps, len(middle))))
             random_selection.extend(random.sample(end, one_third_time_steps))
         elif len(vh_vv_pairs) >= 3 and self.time_steps < len(vh_vv_pairs):
             # if we have a short enough sample, just use first, some arbritary selection of the middle, and the final frame
