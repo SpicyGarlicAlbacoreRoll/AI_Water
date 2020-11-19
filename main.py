@@ -23,7 +23,8 @@ from keras.optimizers import Adam
 from keras.metrics import MeanIoU
 from keras.losses import BinaryCrossentropy
 from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient
-# from src.plots import edit_predictions, plot_predictions
+from src.plots import write_mask_to_file
+from src.gdal_wrapper import gdal_open
 
 from src.model.architecture.crop_masked import create_cdl_model_masked
 from keras.preprocessing.image import array_to_img
@@ -121,11 +122,13 @@ def test_wrapper(args: Namespace) -> None:
                 image = np.array(image[:, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1)).astype(dtype=np.uint8)
 
                 if np.ptp(image) != 0:
-                    img_0 = array_to_img(image)
+                    # img_0 = array_to_img(image)
                     prediction_frame = "_".join(sample[0][0].split("_")[-4:])
                     filename = f"{prediction_subdataset_name}/CDL_{current_subdataset}_prediction_{prediction_frame}"
+                    dataset_path_to_sample = f"datasets/{args.dataset}/{sample[0][0]}"
                     # filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
-                    img_0.save(filename)
+                    save_img(filename, dataset_path_to_sample, image)
+                    # img_0.save(filename)
                     non_blank_predictions+=1
 
 
@@ -145,8 +148,8 @@ def test_wrapper(args: Namespace) -> None:
 
     print("samples:" + str(len(predictions * model_batch_size)))
 
-    for idx in range(len(test_batch_metadata)):
-        os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, idx))
+    # for idx in range(len(test_batch_metadata)):
+    #     os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, idx))
     # set to -1 to account for 0 mod 4 = 0 in batch_indexing
     # print(len(predictions))
     # print(f"Sample Shape: {predictions[0].shape}")
@@ -168,6 +171,15 @@ def test_wrapper(args: Namespace) -> None:
     #             non_blank_predictions+=1
     print(f"Total non-blank predictions saved: {non_blank_predictions} out of {len(predictions)} predictions")
 
+
+def save_img(file_path: str, sample_file_path: str, pred, dem=NETWORK_DEMS) -> None:
+    with gdal_open(sample_file_path) as f:
+        mask_projection = f.GetProjection()
+        mask_geo_transform = f.GetGeoTransform()
+
+    write_mask_to_file(
+        pred.reshape(dem, dem), file_path, mask_projection, mask_geo_transform
+    )
 
 if __name__ == '__main__':
     p = ArgumentParser()
