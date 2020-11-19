@@ -16,7 +16,7 @@ from argparse import ArgumentParser, Namespace
 from src.asf_cnn import test_model_masked, train_model, test_model_timeseries
 from src.model import load_model, path_from_model_name
 from src.model.architecture.masked import create_model_masked
-from src.config import NETWORK_DEMS
+from src.config import NETWORK_DEMS, BATCH_SIZE
 from src.model.architecture.dice_loss import jaccard_distance_loss
 from PIL import Image, ImageOps
 from keras.optimizers import Adam
@@ -85,30 +85,53 @@ def test_wrapper(args: Namespace) -> None:
 
     os.mkdir("predictions/{0}".format(prediction_directory_name))
 
+    # {
+       # model_info: {}
+       # batch_x [
+       #    [
+       #    {
+       #    sample_x: {
+       #            timesteps: [
+       #                [
+       #                    test/WA_2018/S1A_ulx_0000_uly_0000.tif    
+       #                ]
+       #            ]
+       #        }
+       # }
+       #    ]
+       # ]
+    # }
+
     # for batches
+    non_blank_predictions = 0
     for idx, batch in enumerate(test_batch_metadata):
-        # print(len(batch))
         metadata["batch_{0}".format(idx)] = []
         samples = []
         # for sample in batch
         for idy, sample in enumerate(batch):
-            # print(len(sample))
+            current_prediction_idx = idx * BATCH_SIZE + idy
+            current_subdataset = sample[0][0].split("/")[1]    #IE: WA_2018, AK_2020
+            prediction_subdataset_name = f"predictions/{prediction_directory_name}/{current_subdataset}"
+
+            if not os.path.isdir(prediction_subdataset_name):
+                os.mkdir(prediction_subdataset_name)
+
+            if len(predictions) > current_prediction_idx:
+                image = predictions[current_prediction_idx]
+                image = np.array(image[:, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1)).astype(dtype=np.uint8)
+
+                if np.ptp(image) != 0:
+                    img_0 = array_to_img(image)
+                    prediction_frame = "_".join(sample[0][0].split("_")[-4:])
+                    filename = f"{prediction_subdataset_name}/CDL_{current_subdataset}_prediction_{prediction_frame}"
+                    # filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
+                    img_0.save(filename)
+                    non_blank_predictions+=1
+
+
             timeseries_sample = {}
-            # for timestep in sample
-            sample_timesteps = []
-            # if idy ==0:
-                # print(sample)
-            # for sub_dataset, frame_index  in sample:
-                
-                # for vh, vv in timeseries:
-                # vh_vv_pair = {"vh": vh, "vv": vv}
-            # sample_timesteps = sample
-            # sample_timesteps = sub_dataset
-            # timeseries_mask_pair["mask"] = sample[1]
             timeseries_sample["timesteps"] = sample
             # The name of the prediction produced by this sample
-
-            # prediction_file_name="prediction_batch_{0}_sample_{1}.tif".format(idx, idy)
             prediction_file_name=f"predictions/{prediction_directory_name}/batch_{idx}/_sample{idy}"
             sample_data = {f"sample_{idy}": timeseries_sample, "prediction": prediction_file_name}
             samples.append(sample_data)
@@ -125,68 +148,24 @@ def test_wrapper(args: Namespace) -> None:
     for idx in range(len(test_batch_metadata)):
         os.mkdir("predictions/{0}/batch_{1}".format(prediction_directory_name, idx))
     # set to -1 to account for 0 mod 4 = 0 in batch_indexing
-    print(len(predictions))
-    print(f"Sample Shape: {predictions[0].shape}")
-    batch_index = 0
-    non_blank_predictions = 0
+    # print(len(predictions))
+    # print(f"Sample Shape: {predictions[0].shape}")
+    # batch_index = 0
+    # non_blank_predictions = 0
 
-    crop_classes = [
-            [0, 0, 0],
-            [229, 208, 18],
-            [203, 79, 128],
-            [42, 116, 80],
-            [255, 148, 33],
-            [89, 210, 176],
-            [83, 43, 116],
-            [205, 139, 25],
-            [205, 173, 117],
-            [205, 194, 175],
-            [182, 89, 210],
-    ]
-
-    for idy, image in enumerate(predictions):
-        if idy % model_batch_size == 0 and idy != 0:        
-            batch_index += 1
+    # for idy, image in enumerate(predictions):
+    #     if idy % model_batch_size == 0 and idy != 0:        
+    #         batch_index += 1
         
-        for idz in range(image.shape[-1]):
-            images = np.array(image[:, :, idz].reshape(NETWORK_DEMS, NETWORK_DEMS, 1))
-            # for idz, frame in enumerate(range(temp.shape[0])):
-                # img_0 = array_to_img(temp[idz, :, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8))
-                # imgs = temp[idz, :, : :]
-                # for idx in range(temp.shape[-1]):
+    #     for idz in range(image.shape[-1]):
+    #         images = np.array(image[:, :, idz].reshape(NETWORK_DEMS, NETWORK_DEMS, 1))
+    #         img = images.reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8)
 
-                # for img in temp[idz, :, :, :]:
-                # for idx in 
-            # for channel_number in range(images.shape[-1]):
-            # rgb_img = np.zeros((NETWORK_DEMS, NETWORK_DEMS, 3)).astype(dtype=np.uint8)
-            img = images.reshape(NETWORK_DEMS, NETWORK_DEMS, 1).astype(dtype=np.uint8)
-
-            if np.ptp(img) != 0:
-                
-                # prediction_mask = []
-
-                # Assign class with max probability to a given pixel
-                # if img.shape[-1] > 1:
-                img_0 = array_to_img(img)
-                filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
-                img_0.save(filename_0)
-                non_blank_predictions+=1
-                # prediction_mask = img.argmax(axis=-1)
-            
-                # for color_idx in range(len(crop_classes)):
-                #     rgb_img[prediction_mask==color_idx] = crop_classes[color_idx]
-                
-                # color_img =  array_to_img(rgb_img)
-                # non_blank_predictions+=1
-                # # img_0_contrast = ImageOps.autocontrast(img_0)
-                # # img_0 = array_to_img(temp[idz, :, :, 1].reshape(512, 512, 1).astype(dtype=np.float32))
-                # # img_1 = array_to_img(np.array(image[0,:,:,1].reshape(512, 512, 1)).astype(dtype=np.uint8))
-                # if np.ptp(rgb_img):
-                #     filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy)
-                #     # filename_1 = "predictions/{0}/batch_{1}/sample_{2}_frame_{3}_class_1.tif".format(prediction_directory_name, batch_index, idy, idz)
-                #     color_img.save(filename_0)
-                #         # img_0_contrast.save(filename_0.replace(".tif", ".png"))
-                #         # img_1.save(filename_1)
+    #         if np.ptp(img) != 0:
+    #             img_0 = array_to_img(img)
+    #             filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
+    #             img_0.save(filename_0)
+    #             non_blank_predictions+=1
     print(f"Total non-blank predictions saved: {non_blank_predictions} out of {len(predictions)} predictions")
 
 
