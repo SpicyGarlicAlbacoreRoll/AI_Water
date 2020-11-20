@@ -147,7 +147,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss="mean_squared_error", optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
+        loss=BinaryCrossentropy(), optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
     )
 
     return model

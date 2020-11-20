@@ -39,7 +39,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss="mean_squared_error", optimizer=Adam(lr=1e-3), metrics=['accuracy']
+            loss=BinaryCrossentropy(), optimizer=Adam(lr=1e-3), metrics=['accuracy']
         )
         model.set_weights(weights)
     #     model.compile(
@@ -128,7 +128,8 @@ def test_wrapper(args: Namespace) -> None:
                     dataset_path_to_sample = f"datasets/{args.dataset}/{sample[0][0]}"
                     # filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
                     save_img(filename, dataset_path_to_sample, image)
-                    # img_0.save(filename)
+                    img_0 = array_to_img(image)
+                    img_0.save(filename.replace(".tif", ".png"))
                     non_blank_predictions+=1
 
 
