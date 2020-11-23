@@ -101,13 +101,18 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         for subsample in range(self.subsampling):
             for sample_idx, (sample_subset_prefix, frame_number) in enumerate(frame_data_temp):
                 time_series_stack = np.zeros((*self.dim, self.n_channels*self.time_steps), dtype=np.float32)
-                time_series_mask = []
                 time_step_idy = 0
 
                 random_selection = self.__random_frame_sample(self.list_IDs[sample_subset_prefix][frame_number])
+                
+                # random_selection = self.list_IDs[sample_subset_prefix][frame_number]
+                #Ignore S1B / S1A in sorting
+                random_selection.sort(key=lambda pair: pair[0].split("_")[1:])
+                
                 if not self.training:
                     sample_metadata.append(random_selection)
 
+                time_step_idz = 0
                 for timestep_idx, (tileVH, tileVV) in enumerate(random_selection):
                     vh, vv = self.__load_vh_vv(tileVH, tileVV)
                     tile_array = self.__create_sample_timestep(vh, vv)
@@ -116,7 +121,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                         min_, max_ = self.clip_range
                         np.clip(X, min_, max_, out=X)
 
-                    time_series_stack[:,:,timestep_idx:timestep_idx+2] = tile_array
+                    time_series_stack[:,:,timestep_idx*2:timestep_idx*2+2] = tile_array
                     time_step_idy += 2
                     # time_series_stack.append(tile_array)
 
@@ -146,10 +151,8 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
                 augmentation_input = {}
 
                 # create keys to retrive augmented images from dictionary
-                # if self.training:
-                #     x_stack, one_hot = self.__augment_training_data(x_stack, one_hot)
-                # else:
-                #     x_stack = x_stack
+                if self.training:
+                    x_stack, one_hot = self.__augment_training_data(x_stack, one_hot)
 
                 # if the mask only contains a single class, swap it with the last valid time stack and mask
                 if np.ptp(x_stack) == 0.0 and last_valid != []:
@@ -173,15 +176,16 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
     def __augment_training_data(self, sample_stack, mask):
         augmentation_input = {}
 
-        for img_idx, img in enumerate(sample_stack):
-            augmentation_input[f"image{img_idx}"] = img
+        # for img_idx in range(sample_stack.shape[-1]):
+        #     augmentation_input[f"image{img_idx}"] = sample_stack[:,:, idx:idx+self.n_channels]
 
-        aug_output = self.augment(image=sample_stack[0], **augmentation_input, mask=mask)
-        print(len(sample_stack))
-        x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(sample_stack))])
+        aug_output = self.augment(image=sample_stack[:,:,:sample_stack.shape[-1]], mask=mask)
+        # print(len(sample_stack))
+        # x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(sample_stack))])
+        image_augmented = aug_output["image"]
         mask_augmented = aug_output["mask"]
 
-        return x_stack_augmented, mask_augmented
+        return image_augmented, mask_augmented
 
     # loads vh and vv tifs from dataset relative filepath (ie: test/WA_2018/S1A_VH_ulx_0_uly_0.tif)
     def __load_vh_vv(self, vh_dataset_path:str, vv_dataset_path: str):
@@ -282,9 +286,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             random_selection.append(vh_vv_pairs[-1])
         else:
             random_selection = random.sample(vh_vv_pairs, min(self.time_steps, len(vh_vv_pairs)))
-        
-        #Ignore S1B / S1A in sorting
-        random_selection.sort(key=lambda pair: pair[0].split("_")[1:])
+
 
         return random_selection
     # def __sort_frames(composite_frame: Tuple[str, str]):

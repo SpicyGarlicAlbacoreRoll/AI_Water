@@ -16,9 +16,8 @@ import tensorflow as tf
 
 import cv2
 from albumentations import (
-    Compose, HorizontalFlip, CLAHE, HueSaturationValue,
-    RandomBrightness, RandomContrast, RandomGamma,
-    ToFloat, ShiftScaleRotate
+    Compose, HorizontalFlip,  VerticalFlip,
+    ToFloat, ShiftScaleRotate,
     )
 
 from ..asf_typing import TimeseriesMetadataFrameKey
@@ -63,6 +62,7 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
         HorizontalFlip(p=training_p),
+        VerticalFlip(p=training_p),
         # RandomContrast(limit=0.2, p=training_p),
         # RandomGamma(gamma_limit=(80, 120), p=training_p),
         # RandomBrightness(limit=0.2, p=training_p),

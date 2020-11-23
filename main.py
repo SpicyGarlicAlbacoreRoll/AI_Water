@@ -39,7 +39,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=BinaryCrossentropy(), optimizer=Adam(lr=1e-3), metrics=['accuracy']
+            loss=dice_coefficient_loss, optimizer=Adam(lr=1e-3), metrics=['accuracy']
         )
         model.set_weights(weights)
     #     model.compile(

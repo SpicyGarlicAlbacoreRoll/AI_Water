@@ -83,7 +83,7 @@ def deconv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 14,
+    num_filters: int = 32,
     time_steps: int = TIME_STEPS,
     dropout: float = 0.5,
     batchnorm: bool = True
@@ -112,23 +112,23 @@ def create_cdl_model_masked(
     p4 = MaxPooling2D((2, 2))(c4)
     p4 = Dropout(dropout)(p4)
 
-    c5 = conv2d_block(p4, num_filters * 4, kernel_size=3, batchnorm=batchnorm)
-    p5 = MaxPooling2D((2, 2))(c5)
-    p5 = Dropout(dropout)(p5)
+    # c5 = conv2d_block(p4, num_filters * 4, kernel_size=3, batchnorm=batchnorm)
+    # p5 = MaxPooling2D((2, 2))(c5)
+    # p5 = Dropout(dropout)(p5)
 
-    c6 = conv2d_block(p5, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
-    p6 = MaxPooling2D((2, 2))(c6)
-    p6 = Dropout(dropout)(p6)    
+    # c6 = conv2d_block(p5, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
+    # p6 = MaxPooling2D((2, 2))(c6)
+    # p6 = Dropout(dropout)(p6)    
     # middle_clstm = ConvLSTM2D(filters=num_filters * 4, kernel_size=3, activation="tanh", padding='same', return_sequences=True)
     # middle_bidirection = Bidirectional(middle_clstm)(p3)
-    middle = conv2d_block(p6, num_filters * 16, kernel_size=3)
+    middle = conv2d_block(p4, num_filters * 8, kernel_size=3)
 
     # Expanding dims
-    uy = deconv2d_block_time_dist(middle, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c6, activation=True)
-    uz = deconv2d_block_time_dist(uy, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c5, activation=True)
-    u = deconv2d_block_time_dist(uz, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
-    u1 = deconv2d_block_time_dist(u, num_filters=num_filters * 2, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
-    u2 = deconv2d_block_time_dist(u1, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
+    # uy = deconv2d_block_time_dist(middle, num_filters=num_filters * 8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c6, activation=True)
+    # uz = deconv2d_block_time_dist(uy, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c5, activation=True)
+    u = deconv2d_block_time_dist(middle, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
+    u1 = deconv2d_block_time_dist(u, num_filters=num_filters * 4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
+    u2 = deconv2d_block_time_dist(u1, num_filters=num_filters * 2, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
     u3 = deconv2d_block_time_dist(u2, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
     
     # classifier (forward-backwards convlstm)
@@ -147,7 +147,7 @@ def create_cdl_model_masked(
     # Adam(lr=1e-3)
     # dice_coefficient_loss
     model.compile(
-        loss=BinaryCrossentropy(), optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
+        loss=dice_coefficient_loss, optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy' ]
     )
 
     return model
