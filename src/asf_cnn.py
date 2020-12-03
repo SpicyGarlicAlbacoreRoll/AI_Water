@@ -59,9 +59,9 @@ def train_model(
         history = model.fit(
             x=training_set,
             validation_data=validation_set,
-            # steps_per_epoch=200,
+            steps_per_epoch=150,
             epochs=1,
-            workers=8,
+            workers=6,
             verbose=verbose)
 
         for key in model_history.keys():

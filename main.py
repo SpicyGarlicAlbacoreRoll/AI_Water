@@ -22,7 +22,7 @@ from PIL import Image, ImageOps
 from keras.optimizers import Adam
 from keras.metrics import MeanIoU
 from keras.losses import BinaryCrossentropy
-from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient
+from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient, cosh_dice_coefficient_loss
 from src.plots import write_mask_to_file
 from src.gdal_wrapper import gdal_open
 
@@ -39,7 +39,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=dice_coefficient_loss, optimizer=Adam(lr=1e-3), metrics=['accuracy']
+            loss=cosh_dice_coefficient_loss, optimizer=Adam(learning_rate=1e-5), metrics=['accuracy', MeanIoU(num_classes=2)]
         )
         model.set_weights(weights)
     #     model.compile(
@@ -53,7 +53,7 @@ def train_wrapper(args: Namespace) -> None:
 
         # model = create_model_masked(model_name)
         model = create_cdl_model_masked(model_name)
-        history = {"loss": [],  'accuracy': [], "val_loss": [], "val_accuracy": [] }
+        history = {'loss': [],  'accuracy': [], "mean_io_u": []}
 
     train_model(model, history, args.dataset, args.epochs)
 

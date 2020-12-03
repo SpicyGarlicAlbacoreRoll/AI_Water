@@ -24,6 +24,12 @@ def dice_coefficient(y_true, y_pred, smooth=1):
 def dice_coefficient_loss(y_true, y_pred):
     return 1-dice_coefficient(y_true, y_pred)
 
+# implementation borrowed from here:
+'''   https://github.com/shruti-jadon/Semantic-Segmentation-Loss-Functions/blob/master/loss_functions.py'''
+def cosh_dice_coefficient_loss(y_true, y_pred):
+    x = dice_coefficient_loss(y_true, y_pred)
+    return tf.math.log((tf.exp(x) + tf.exp(-x)) / 2.0)
+
 # def soft_dice_coefficient(y_true, y_pred, smooth=1):
 
 #     # flatten prediction and mask along single axis
@@ -40,7 +46,7 @@ def dice_coefficient_loss(y_true, y_pred):
 #     return 1-dice_coefficient(y_true, y_pred)
 
 
-"""A slightly better loss function for unbalanced datasets"""
+"""A slightly better loss function than dice for unbalanced datasets"""
 def Jaccard_coefficient(y_true, y_pred, smooth=100):
     # flatten prediction and mask along single axis
     y_true_flat = K.flatten(y_true)

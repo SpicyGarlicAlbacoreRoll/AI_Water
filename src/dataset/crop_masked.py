@@ -54,19 +54,14 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
     time_steps = TIME_STEPS
     sub_sampling = 1
     n_classes = 2
-    loops=TRAINING_LOOPS
     training_p = AUGMENTATION_PROBABILITY
 
-    print_generator_info(validation_split, time_steps, sub_sampling, sample_size, loops)
+    print_generator_info(validation_split, time_steps, sub_sampling, sample_size)
 
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
         HorizontalFlip(p=training_p),
         VerticalFlip(p=training_p),
-        # RandomContrast(limit=0.2, p=training_p),
-        # RandomGamma(gamma_limit=(80, 120), p=training_p),
-        # RandomBrightness(limit=0.2, p=training_p),
-        # CLAHE(p=1.0, clip_limit=2.0),
         ShiftScaleRotate(
             shift_limit=0.0625, scale_limit=0.1, 
             rotate_limit=45, border_mode=cv2.BORDER_REFLECT_101, p=training_p),
@@ -80,11 +75,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
         time_steps=time_steps,
         n_channels=N_CHANNELS,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
-        output_channels=3,
+        output_channels=1,
         n_classes=n_classes,
         dataset_directory=dataset_dir(dataset),
         shuffle=True,
-        subsampling=sub_sampling,
         min_samples=MIN_TRAINING_SAMPLES,
         augmentations=AUGMENTATIONS_TRAIN)
 
@@ -115,7 +109,7 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
     batch_size=BATCH_SIZE
     n_classes=2
     test_iter = SARTimeseriesGenerator(
-        test_metadata,
+        time_series_metadata=test_metadata,
         time_series_frames=frame_keys,
         batch_size=batch_size,
         dim=(NETWORK_DEMS, NETWORK_DEMS),
@@ -123,7 +117,6 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
         n_channels=N_CHANNELS,
         output_dim=(NETWORK_DEMS, NETWORK_DEMS),
         output_channels=1,
-        subsampling=sub_sampling,
         dataset_directory=dataset_dir(dataset),
         n_classes=n_classes,
         training=False,
@@ -220,15 +213,13 @@ def validate_image(path: str, dir: str, image: str) -> bool:
     return True
 
 """Prints information related to the model"""
-def print_generator_info(validation_split, time_steps, sub_sampling, sample_size, loops):
+def print_generator_info(validation_split, time_steps, sub_sampling, sample_size):
     split_index = floor(sample_size * validation_split)
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
     print(f"Timesteps:\t{time_steps}")
     print(f"Random Subsampling:\t{sub_sampling}")
     print(f"Base Training Samples:\t{sample_size-split_index}")
-    print(f"\tTotal Training Samples with random subsampling:\t{sample_size-split_index} * {sub_sampling} = {sub_sampling*(sample_size-split_index)}")
     print(f"Base Validation Samples:\t{split_index}")
-    print(f"\tTotal Validation Samples with random subsampling:\t{split_index} * {sub_sampling} = {sub_sampling*split_index}\n")
 
-    print(f"\nTotal training samples with loops:\t {loops*(sample_size-split_index)}")
+    print(f"Minimum samples:\t{MIN_TRAINING_SAMPLES}")
