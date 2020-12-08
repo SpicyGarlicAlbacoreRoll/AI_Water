@@ -59,7 +59,7 @@ def train_model(
         history = model.fit(
             x=training_set,
             validation_data=validation_set,
-            steps_per_epoch=150,
+            # steps_per_epoch=150,
             epochs=1,
             workers=6,
             verbose=verbose)

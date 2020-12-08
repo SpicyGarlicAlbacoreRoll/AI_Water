@@ -22,7 +22,7 @@ from albumentations import (
 
 from ..asf_typing import TimeseriesMetadataFrameKey
 from ..config import NETWORK_DEMS
-from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY, BATCH_SIZE, MIN_TRAINING_SAMPLES
+from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY, BATCH_SIZE, MIN_TRAINING_SAMPLES, CROP_CLASSES
 from ..gdal_wrapper import gdal_open
 from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from .common import dataset_dir, valid_image
@@ -52,11 +52,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
 
     batch_size = BATCH_SIZE
     time_steps = TIME_STEPS
-    sub_sampling = 1
-    n_classes = 2
+    n_classes = CROP_CLASSES
     training_p = AUGMENTATION_PROBABILITY
 
-    print_generator_info(validation_split, time_steps, sub_sampling, sample_size)
+    print_generator_info(validation_split, time_steps, sample_size)
 
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
@@ -105,7 +104,6 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
     test_metadata = find_timeseries_metadata(dataset, training=False)
     frame_keys, sample_size, time_steps = generate_frame_keys(test_metadata)
     time_steps = TIME_STEPS
-    sub_sampling = 1
     batch_size=BATCH_SIZE
     n_classes=2
     test_iter = SARTimeseriesGenerator(
@@ -213,12 +211,11 @@ def validate_image(path: str, dir: str, image: str) -> bool:
     return True
 
 """Prints information related to the model"""
-def print_generator_info(validation_split, time_steps, sub_sampling, sample_size):
+def print_generator_info(validation_split, time_steps, sample_size):
     split_index = floor(sample_size * validation_split)
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
     print(f"Timesteps:\t{time_steps}")
-    print(f"Random Subsampling:\t{sub_sampling}")
     print(f"Base Training Samples:\t{sample_size-split_index}")
     print(f"Base Validation Samples:\t{split_index}")
 

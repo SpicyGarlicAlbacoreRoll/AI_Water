@@ -86,7 +86,7 @@ def deconv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 32,
+    num_filters: int = 8,
     time_steps: int = TIME_STEPS,
     dropout: float = 0.5,
     batchnorm: bool = True
@@ -94,7 +94,7 @@ def create_cdl_model_masked(
     """ Function to define the Time Distributed UNET Model """
 
     """Requires stack of Sequential SAR data (with vh vv channels stacked), where each image is a different timestep"""
-    inputs = Input(shape=(dems, dems, N_CHANNELS*time_steps), batch_size=None)
+    inputs = Input(shape=(None, None, N_CHANNELS*time_steps), batch_size=None)
     c1 = conv2d_block(
         inputs, num_filters * 1, kernel_size=3, batchnorm=batchnorm
     )
@@ -151,7 +151,7 @@ def create_cdl_model_masked(
     # dice_coefficient_loss
     #[BinaryCrossentropy(from_logits=False), cosh_dice_coefficient_loss]
     model.compile(
-        loss="mean_squared_error", optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2) ]
+        loss=cosh_dice_coefficient_loss, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2) ]
     )
 
     return model

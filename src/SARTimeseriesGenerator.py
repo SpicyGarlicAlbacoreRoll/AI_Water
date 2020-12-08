@@ -4,6 +4,7 @@
 import os
 import random
 import re
+from src.CDLFrameData import CDLFrameData 
 from typing import Dict, List, Optional, Tuple
 from src.config import TIME_STEPS, MIN_TIME_STEPS, NETWORK_DEMS
 import keras
@@ -42,7 +43,9 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         if training:
             while len(self.frame_data) < min_samples:
                 self.frame_data.extend(random.sample(self.frame_data, min(min_samples - len(self.frame_data), len(self.frame_data))))
-
+        print("key data pre:", self.frame_data[0])
+        self.frame_data = [CDLFrameData(sample[0], sample[1], dataset_directory) for sample in self.frame_data]
+        print("key data post:", self.frame_data[0].get_frame_index_key(), self.frame_data[0].get_dataset_name())
         self.n_channels = n_channels
         self.output_dim = output_dim
         self.output_channels = output_channels
@@ -110,92 +113,90 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         else:
             y = np.zeros((self.batch_size, *self.output_dim, 1), dtype=np.float32)
 
-        #frame numbers are in the "ulx_0_uly_0" format
-        last_valid = []
-        last_mask = []
-        for sample_idx, (sample_subset_prefix, frame_number) in enumerate(frame_data_temp):
-            time_series_stack = np.zeros((*self.dim, self.n_channels*self.time_steps), dtype=np.float32)
-            time_step_idy = 0
-
-            random_selection = self.__random_frame_sample(self.list_IDs[sample_subset_prefix][frame_number])
+        # sample_subset_prefix: "WA_2018", "OR_2017"
+        #frame_number: "ulx_0_uly_0"
+        for sample_idx, sample_key_data in enumerate(frame_data_temp):
             
-            # random_selection = self.list_IDs[sample_subset_prefix][frame_number]
-            #Ignore S1B / S1A in sorting
-            random_selection.sort(key=lambda pair: pair[0].split("_")[1:])
+            frame_number = sample_key_data.get_frame_index_key()
+            sample_subset_prefix = sample_key_data.get_dataset_name()
+
+            if self.training:
+                X[sample_idx,], y[sample_idx] = sample_key_data.load_timeseries_frame_data(self.list_IDs[sample_subset_prefix][frame_number], self.dim, self.n_channels, self.time_steps, self.augment)
+            else:
+                X[sample_idx,], y[sample_idx] = sample_key_data.load_timeseries_frame_data(self.list_IDs[sample_subset_prefix][frame_number], self.dim, self.n_channels, self.time_steps)             
+                sample_metadata.append(sample_key_data.get_metadata_paths())
+        # for sample_idx, (sample_subset_prefix, frame_number) in enumerate(frame_data_temp):
+        #     time_series_stack = np.zeros((*self.dim, self.n_channels*self.time_steps), dtype=np.float32)
+        #     time_step_idy = 0
+
+        #     random_selection = self.__random_frame_sample(self.list_IDs[sample_subset_prefix][frame_number])
+
+        #     # Ignore S1B / S1A prefix in sorting
+        #     random_selection.sort(key=lambda pair: pair[0].split("_")[1:])
             
-            if not self.training:
-                sample_metadata.append(random_selection)
+        #     if not self.training:
+        #         sample_metadata.append(random_selection)
 
-            time_step_idz = 0
-            for timestep_idx, (tileVH, tileVV) in enumerate(random_selection):
-                vh, vv = self.__load_vh_vv(tileVH, tileVV)
-                tile_array = self.__create_sample_timestep(vh, vv)
+        #     time_step_idz = 0
+        #     for timestep_idx, (tileVH, tileVV) in enumerate(random_selection):
+        #         vh, vv = self.__load_vh_vv(tileVH, tileVV)
+        #         tile_array = self.__create_sample_timestep(vh, vv)
 
-                if self.clip_range:
-                    min_, max_ = self.clip_range
-                    np.clip(X, min_, max_, out=X)
+        #         if self.clip_range:
+        #             min_, max_ = self.clip_range
+        #             np.clip(X, min_, max_, out=X)
 
-                time_series_stack[:,:,timestep_idx*2:timestep_idx*2+2] = tile_array
-                time_step_idy += 2
-                # time_series_stack.append(tile_array)
+        #         time_series_stack[:,:,timestep_idx*2:timestep_idx*2+2] = tile_array
+        #         time_step_idy += 2
 
-            # if we end up with a stack with less than the set amount of timesteps, 
-            # append existing elements until we get enough timesteps
+        #     # if we end up with a stack with less than the set amount of timesteps, 
+        #     # append existing elements until we get enough timesteps
 
-            # We have three options to work around this problem of variable timesteps we either
-                # Removing rows with missing values.
-                # Mark and learn missing values.
-                # Mask and learn without missing values.
-            if time_step_idy < self.time_steps*self.n_channels:
-                # idx = len(time_series_stack)
-                # pad out the sequence with the last time step if there aren't enough timesteps
-                temp = time_series_stack[:,:,-2:]
-                while(time_step_idy != self.time_steps*self.n_channels):
-                    time_series_stack[:,:,time_step_idy:time_step_idy+2] = temp
-                    time_step_idy += 2
+        #     # We have three options to work around this problem of variable timesteps we either
+        #         # Removing rows with missing values.
+        #         # Mark and learn missing values.
+        #         # Mask and learn without missing values.
+        #     if time_step_idy < self.time_steps*self.n_channels:
+        #         # idx = len(time_series_stack)
+        #         # pad out the sequence with the last time step if there aren't enough timesteps
+        #         temp = time_series_stack[:,:,-2:]
+        #         while(time_step_idy != self.time_steps*self.n_channels):
+        #             time_series_stack[:,:,time_step_idy:time_step_idy+2] = temp
+        #             time_step_idy += 2
 
-            #convert list of vv vh composites to numpy array
-            x_stack = np.stack(time_series_stack, axis=0)
-            # print(x_stack.shape)
+        #     #convert list of vv vh composites to numpy array
+        #     x_stack = np.stack(time_series_stack, axis=0)
 
-            mask_array = self.__get_mask(sample_subset_prefix, frame_number)
-            # one_hot = self.__to_one_hot(mask_array, self.n_classes)
+        #     mask_array = self.__get_mask(sample_subset_prefix, frame_number)
+        #     # one_hot = self.__to_one_hot(mask_array, self.n_classes)
 
-            # Augment data
-            augmentation_input = {}
+        #     # Augment data
+        #     if self.training:
+        #         x_stack, mask_array = self.__augment_training_data(x_stack, mask_array)
 
-            # create keys to retrive augmented images from dictionary
-            # if self.training:
-            #     x_stack, mask_array = self.__augment_training_data(x_stack, mask_array)
-
-            # if the mask only contains a single class, swap it with the last valid time stack and mask
-            # if np.ptp(x_stack) == 0.0 and last_valid != []:
-            #     # print("set 0 to last valid")
-            #     x_stack = last_valid
-            #     one_hot = last_mask
-            # elif np.ptp(x_stack) != 0.0:
-            #     last_valid = x_stack
-            #     last_mask = one_hot
-
-            X[sample_idx,] = x_stack
-            y[sample_idx,] = mask_array.reshape((*self.output_dim, self.output_channels))
+            # X[sample_idx,] = x_stack
+            # y[sample_idx,] = mask_array.reshape((*self.output_dim, self.output_channels))
 
         #keep track of testing data
         if not self.training:
             self.__setBatchMetadata(sample_metadata)
+
         return np.nan_to_num(X, nan=0, copy=False), np.nan_to_num(y, nan=0, copy=False)
 
 
     # Non-keras.utils.Sequence functions
+
+    # Augment training data using albumentations library
     def __augment_training_data(self, sample_stack, mask):
         augmentation_input = {}
 
+        aug_output = self.augment(image=sample_stack[:,:,:sample_stack.shape[-1]], mask=mask)
+
+        # non-channel packing implementation, for 4D input (timesteps, widht, height, channels)
         # for img_idx in range(sample_stack.shape[-1]):
         #     augmentation_input[f"image{img_idx}"] = sample_stack[:,:, idx:idx+self.n_channels]
-
-        aug_output = self.augment(image=sample_stack[:,:,:sample_stack.shape[-1]], mask=mask)
-        # print(len(sample_stack))
         # x_stack_augmented = np.stack([aug_output[f"image{img_idx}"] for img_idx in range(len(sample_stack))])
+
         image_augmented = aug_output["image"]
         mask_augmented = aug_output["mask"]
 

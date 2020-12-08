@@ -41,7 +41,7 @@ def valid_mask(frame_name, mask_dict) -> bool:
         return True
 
     # ignore cropmask files that are primarily one class (background, qgis no-data value)
-    if frequency_dict.get("0") > 0.15 and frequency_dict.get("0") < 0.66:
+    if frequency_dict.get("0") > 0.15 and frequency_dict.get("0") < 0.75:
         return True
 
     return False
@@ -152,13 +152,14 @@ def create_sample_split() -> None:
         if len(updated_frames["test"][test_frame_name]) <= 1:
             updated_frames["test"].pop(test_frame_name, None)
         
-        temp = updated_frames['test'][test_frame_name]
-        temp.sort()
-        composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
+        else:
+            temp = updated_frames['test'][test_frame_name]
+            temp.sort()
+            composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
 
-        # in cases where S1A and S1B are in the same list they are sorted by dates
-        composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
-        updated_frames['test'][test_frame_name] = composite_temp
+            # in cases where S1A and S1B are in the same list they are sorted by dates
+            composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
+            updated_frames['test'][test_frame_name] = composite_temp
 
     print("Train data")
     for frame_name in tqdm(frame_names):
@@ -187,15 +188,15 @@ def create_sample_split() -> None:
 
         if len(updated_frames["train"][frame_name]) <= 1:
             updated_frames["train"].pop(frame_name, None)
+        else:
+            # sorting ahead of time speeds up model
+            temp = updated_frames['train'][frame_name]
+            temp.sort()
+            composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
 
-        # sorting ahead of time speeds up model
-        temp = updated_frames['train'][frame_name]
-        temp.sort()
-        composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
-
-        # in cases where S1A and S1B are in the same list they are sorted by dates
-        composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
-        updated_frames['train'][frame_name] = composite_temp
+            # in cases where S1A and S1B are in the same list they are sorted by dates
+            composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
+            updated_frames['train'][frame_name] = composite_temp
 
     print("Training data finished")
     print("serializing metadata...")
