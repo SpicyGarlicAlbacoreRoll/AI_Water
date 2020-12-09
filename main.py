@@ -39,7 +39,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss=cosh_dice_coefficient_loss, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2)]
+            loss="mean_squared_error", optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2)]
         )
         model.set_weights(weights)
     #     model.compile(

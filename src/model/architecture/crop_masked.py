@@ -151,7 +151,7 @@ def create_cdl_model_masked(
     # dice_coefficient_loss
     #[BinaryCrossentropy(from_logits=False), cosh_dice_coefficient_loss]
     model.compile(
-        loss=cosh_dice_coefficient_loss, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2) ]
+        loss="mean_squared_error", optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2) ]
     )
 
     return model

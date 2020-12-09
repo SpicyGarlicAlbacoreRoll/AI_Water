@@ -43,9 +43,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         if training:
             while len(self.frame_data) < min_samples:
                 self.frame_data.extend(random.sample(self.frame_data, min(min_samples - len(self.frame_data), len(self.frame_data))))
-        print("key data pre:", self.frame_data[0])
         self.frame_data = [CDLFrameData(sample[0], sample[1], dataset_directory) for sample in self.frame_data]
-        print("key data post:", self.frame_data[0].get_frame_index_key(), self.frame_data[0].get_dataset_name())
         self.n_channels = n_channels
         self.output_dim = output_dim
         self.output_channels = output_channels
@@ -65,15 +63,11 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
             sample_subset_prefix, frame_number = sample_prefix_and_frame
             frame = self.list_IDs[sample_subset_prefix][frame_number]
             if len(frame) < self.min_time_steps:
-                # if idx < 10:
-                #     print(f"{len(frame)}\n{frame}")
                 self.list_IDs[sample_subset_prefix].pop(frame_number)
                 self.frame_data[idx] = None
         
         self.frame_data = [x for x in self.frame_data if x != None]
-            # if sample_idx == 0:
-                # print(len(frame))
-        # if self.training:
+
         print(f"Samples: {old_sample_size}")
         print(f"Samples with at least {self.min_time_steps} time steps:\t {len(self.frame_data)}")
             
@@ -118,7 +112,7 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         for sample_idx, sample_key_data in enumerate(frame_data_temp):
             
             frame_number = sample_key_data.get_frame_index_key()
-            sample_subset_prefix = sample_key_data.get_dataset_name()
+            sample_subset_prefix = sample_key_data.get_sub_dataset_name()
 
             if self.training:
                 X[sample_idx,], y[sample_idx] = sample_key_data.load_timeseries_frame_data(self.list_IDs[sample_subset_prefix][frame_number], self.dim, self.n_channels, self.time_steps, self.augment)
