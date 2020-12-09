@@ -23,78 +23,33 @@ class CDLFrameData():
     def get_frame_index_key(self) -> str:
         return self.frame_index_key
 
-
-    def __create_timeseries_sample(self, timeseries_sample_prefix_and_frames, dims, n_channels, timesteps):
-        timeseries_sample = np.zeros((*dims, n_channels*timesteps), dtype=np.float32)
-
-        for timestep_idx, (tileVH, tileVV) in enumerate(timeseries_sample_prefix_and_frames):
-            vh, vv = self.__load_vh_vv(tileVH, tileVV)
-            tile_array = self.__create_sample_timestep(vh, vv, n_channels)
-
-            # if self.clip_range:
-            #     min_, max_ = self.clip_range
-            #     np.clip(X, min_, max_, out=X)
-
-            timeseries_sample[:,:,timestep_idx*2:timestep_idx*2+2] = tile_array
-        
-        return timeseries_sample
-
     def load_timeseries_frame_data(self, data_paths, dims, n_channels, timesteps, augmentations=Compose([ToFloat(max_value=255, p=0.0),
         ])):
-        time_series_stack = np.zeros((*dims, n_channels*timesteps), dtype=np.float32)
-        time_step_idy = 0
-        # print(data_paths)
+
+        # randomly choose time steps to include in timeseries sample
         random_selection = self.__random_frame_sample(data_paths, timesteps)
 
-
-
+        # if the timeseries has fewer timesteps than what we want to train the model with, we pad it
+        # with existing randomly selected timesteps
         if len(random_selection) < timesteps:
             random_selection = self.__extend_sample_timesteps(random_selection, timesteps)
 
-        # Ignore S1B / S1A prefix in sorting
+        # train model on chronologically ordered data
         random_selection = self.__sort_data(random_selection)
-
+        # load the actual data from our randomly chosen files
         timeseries_sample = self.__create_timeseries_sample(random_selection, dims, n_channels, timesteps)
 
+        # keep track of file paths for model test file metadata
         self.file_paths = random_selection
 
-        # time_step_idz = 0
-        # # print(random_selection)
-        # for timestep_idx, (tileVH, tileVV) in enumerate(random_selection):
-        #     vh, vv = self.__load_vh_vv(tileVH, tileVV)
-        #     tile_array = self.__create_sample_timestep(vh, vv, n_channels)
-
-        #     # if self.clip_range:
-        #     #     min_, max_ = self.clip_range
-        #     #     np.clip(X, min_, max_, out=X)
-
-        #     time_series_stack[:,:,timestep_idx*2:timestep_idx*2+2] = tile_array
-        #     time_step_idy += 2
-
-        # if we end up with a stack with less than the set amount of timesteps, 
-        # append existing elements until we get enough timesteps
-
-        # We have three options to work around this problem of variable timesteps we either
-            # Removing rows with missing values.
-            # Mark and learn missing values.
-            # Mask and learn without missing values.
-        # if time_step_idy < timesteps*n_channels:
-        #     # idx = len(time_series_stack)
-        #     # pad out the sequence with the last time step if there aren't enough timesteps
-        #     temp = time_series_stack[:,:,-2:]
-        #     while(time_step_idy != timesteps*n_channels):
-        #         time_series_stack[:,:,time_step_idy:time_step_idy+2] = temp
-        #         time_step_idy += 2
-
-        #convert list of vv vh composites to numpy array
-        x_stack = np.stack(timeseries_sample, axis=0)
-
         mask_array = self.__get_mask(self.sub_dataset, self.frame_index_key)
-        # one_hot = self.__to_one_hot(mask_array, self.n_classes)
 
-        x_stack, mask_array = self.__augment_data(x_stack, mask_array, augmentations)
+        # convert mask to one_hot encoding for categorical data (multi-class classification, non-binary)
+        # mask_array = self.__to_one_hot(mask_array, n_classes, dims)
 
-        return x_stack, mask_array.reshape((NETWORK_DEMS, NETWORK_DEMS, 1))
+        x_stack, mask_array = self.__augment_data(timeseries_sample, mask_array, augmentations)
+
+        return x_stack, mask_array.reshape((*dims, 1))
 
     def get_metadata_paths(self):
         return self.file_paths
@@ -137,7 +92,7 @@ class CDLFrameData():
         while len(output) < time_steps:
             output.extend(random.sample(vh_vv_pairs, min(time_steps - len(vh_vv_pairs), len(vh_vv_pairs))))  
         
-        return output
+        return output[:time_steps]
 
     # loads vh and vv tifs from dataset relative filepath (ie: test/WA_2018/S1A_VH_ulx_0_uly_0.tif)
     def __load_vh_vv(self, vh_dataset_path:str, vv_dataset_path: str):
@@ -169,16 +124,10 @@ class CDLFrameData():
                 tile_array = vh
             else:
                 tile_array = vv
-
-            # tile_array = np.stack((vh, vv), axis=2).astype('float32')
-        # if np.ptp(tile_array) == 0:
-        #     tile_array = np.ones(shape=(*self.dim, self.n_channels)).astype('float32')
-        # else:
-        #     tile_array = (tile_array - np.min(tile_array))/ np.ptp(tile_array)
         
         return tile_array
 
-    # given the prefix and frame index
+    # given the prefix and frame index, find the corresponding mask over the given area
     def __get_mask(self, sample_subset_prefix: str, frame_number, mask_shape=(NETWORK_DEMS, NETWORK_DEMS, 1)):
         # get corresponding mask prefix (ie: CA_2019, and grab the corresponding mask file)
         subset_name = f"{'_'.join(sample_subset_prefix.split('_')[:-1])}"
@@ -218,3 +167,31 @@ class CDLFrameData():
         # Ignore S1B / S1A prefix in sorting
         time_step_paths.sort(key=lambda pair: "_".join(pair[0].split("_")[1:]))
         return time_step_paths
+
+    def __create_timeseries_sample(self, timeseries_sample_prefix_and_frames, dims, n_channels, timesteps):
+        timeseries_sample = np.zeros((*dims, n_channels*timesteps), dtype=np.float32)
+
+        for timestep_idx, (tileVH, tileVV) in enumerate(timeseries_sample_prefix_and_frames):
+            vh, vv = self.__load_vh_vv(tileVH, tileVV)
+            tile_array = self.__create_sample_timestep(vh, vv, n_channels)
+
+            # if self.clip_range:
+            #     min_, max_ = self.clip_range
+            #     np.clip(X, min_, max_, out=X)
+
+            timeseries_sample[:,:,timestep_idx*2:timestep_idx*2+2] = tile_array
+        
+        return timeseries_sample
+
+    # Encodes the time series mask, an image array of shape (dim, dim, 1), into a one-hot encoding form for Categorical CrossEntropy loss with softmax activation.
+    # Each unique pixel value represents a category, and the amount of unique pixel values should = the number of categories, including the background
+    # For each unique category we create a channel, and for each pixel in that category we assign a 1 to that pixel position in it's corresponding channel.
+    def __to_one_hot(self, mask_array, n_classes, output_dim):
+        one_hot = []
+        if n_classes > 2:
+            one_hot = np.zeros((mask_array.shape[0], mask_array.shape[1], n_classes))
+            for i, unique_value in enumerate(np.unique(mask_array)):
+                one_hot[:, :, i][mask_array == unique_value] = 1
+        else:
+            one_hot = mask_array.reshape(output_dim, 1) #[:, :, 0].reshape(*self.output_dim, 1)
+        return one_hot
