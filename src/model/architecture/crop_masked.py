@@ -17,7 +17,7 @@ from keras.optimizers import Adam
 from keras.optimizers.schedules import ExponentialDecay
 from tensorflow.python.framework.ops import disable_eager_execution
 
-from src.config import CROP_CLASSES, N_CHANNELS
+from src.config import CROP_CLASSES, N_CHANNELS, NUM_FILTERS
 from src.config import NETWORK_DEMS as dems
 from src.config import TIME_STEPS
 from src.model.architecture.dice_loss import jaccard_distance_loss, dice_coefficient_loss, cosh_dice_coefficient_loss
@@ -42,8 +42,6 @@ def conv2d_block(
         x = BatchNormalization()(x)
     if activation:
         x = Activation('relu')(x)
-
-    return x
 
     # second conv layer
 
@@ -86,7 +84,7 @@ def deconv2d_block_time_dist(
 
 def create_cdl_model_masked(
     model_name: str,
-    num_filters: int = 8,
+    num_filters: int = NUM_FILTERS,
     time_steps: int = TIME_STEPS,
     dropout: float = 0.5,
     batchnorm: bool = True
@@ -111,7 +109,7 @@ def create_cdl_model_masked(
     p3 = Dropout(dropout)(p3)
 
 
-    c4 = conv2d_block(p3, num_filters * 4, kernel_size=3, batchnorm=batchnorm)
+    c4 = conv2d_block(p3, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p4 = MaxPooling2D((2, 2))(c4)
     p4 = Dropout(dropout)(p4)
 
@@ -121,15 +119,20 @@ def create_cdl_model_masked(
 
     c6 = conv2d_block(p5, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
     p6 = MaxPooling2D((2, 2))(c6)
-    p6 = Dropout(dropout)(p6)    
+    p6 = Dropout(dropout)(p6)
+
+    c7 = conv2d_block(p6, num_filters * 8, kernel_size=3, batchnorm=batchnorm)
+    p7 = MaxPooling2D((2, 2))(c7)
+    p7 = Dropout(dropout)(p7)    
     # middle_clstm = ConvLSTM2D(filters=num_filters * 4, kernel_size=3, activation="tanh", padding='same', return_sequences=True)
     # middle_bidirection = Bidirectional(middle_clstm)(p3)
-    middle = conv2d_block(p6, num_filters * 8, kernel_size=3)
+    middle = conv2d_block(p7, num_filters * 8, kernel_size=3)
 
-    # Expanding dims
-    uy = deconv2d_block_time_dist(middle, num_filters=num_filters*8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c6, activation=True)
+        # Expanding dims
+    uw = deconv2d_block_time_dist(middle, num_filters=num_filters*8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c7, activation=True)
+    uy = deconv2d_block_time_dist(uw, num_filters=num_filters*8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c6, activation=True)
     uz = deconv2d_block_time_dist(uy, num_filters=num_filters*4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c5, activation=True)
-    u = deconv2d_block_time_dist(uz, num_filters=num_filters*4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
+    u = deconv2d_block_time_dist(uz, num_filters=num_filters*8, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c4, activation=True)
     u1 = deconv2d_block_time_dist(u, num_filters=num_filters*4, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c3, activation=True)
     u2 = deconv2d_block_time_dist(u1, num_filters=num_filters*2, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c2, activation=True)
     u3 = deconv2d_block_time_dist(u2, num_filters=num_filters, dropout=dropout, kernel_size=3, batchnorm=batchnorm, concat_layer=c1, activation=True)
@@ -151,7 +154,7 @@ def create_cdl_model_masked(
     # dice_coefficient_loss
     #[BinaryCrossentropy(from_logits=False), cosh_dice_coefficient_loss]
     model.compile(
-        loss="mean_squared_error", optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2) ]
+        loss=jaccard_distance_loss, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2) ]
     )
 
     return model

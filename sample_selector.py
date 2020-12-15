@@ -19,7 +19,6 @@ def valid_mask(frame_name, mask_dict) -> bool:
     frame_name = f"{frame_name}.tif"
     target_mask_file = mask_dict.get(frame_name)
     if target_mask_file == None:
-        
         return False
     
     output = []
@@ -41,9 +40,10 @@ def valid_mask(frame_name, mask_dict) -> bool:
         return True
 
     # ignore cropmask files that are primarily one class (background, qgis no-data value)
-    if frequency_dict.get("0") > 0.15 and frequency_dict.get("0") < 0.75:
+    if frequency_dict.get("0") < 0.8:
         return True
 
+    # return True
     return False
 
 def get_tiles(files: List) -> (Dict, List):
@@ -83,6 +83,12 @@ root directory of a dataset using the subdataset created by this function."""
 def create_sample_split() -> None:
     state = input("Enter state acronym (IE: AK, WA, OR):\t")
     year = input("Enter year (IE 2017, 2020, 2019):\t")
+    is_testing = input("Testing data? (All data will be moved to test folder) ['test'/'train']:\t")
+
+    is_test_data = False
+
+    if is_testing == "test":
+        is_test_data = True
 
     dir = f'{state}_{year}'
     print (dir)
@@ -113,10 +119,14 @@ def create_sample_split() -> None:
     test_split = floor((len(frame_names) * .10))
     frame_names.sort()
     
-    test_data_frame_names = Random(64).sample(frame_names, test_split)
+    test_data_frame_names = frame_names
+    if not is_test_data:
+        test_data_frame_names = Random(64).sample(frame_names, test_split)
+
     print("Splitting test/training data...")
     frame_names = [x for x in frame_names if x not in test_data_frame_names]
-    print(f"{len(test_data_frame_names)} / {len(frame_names)} = {len(test_data_frame_names) / len(frame_names)}")
+    if not is_test_data:
+        print(f"{len(test_data_frame_names)} / {len(frame_names)} = {len(test_data_frame_names) / len(frame_names)}")
     print("Validating and moving data for...")
     print("Test data")
     updated_frames = {}
@@ -133,9 +143,11 @@ def create_sample_split() -> None:
         # if frames[test_frame_name]
         for vv, vh in frames[test_frame_name]:
             if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
+                # print("CONTINUING")
                 continue
-            if not validate_image(prep_tiles_path, "tiles/", vv):
-                continue
+            # if not validate_image(prep_tiles_path, "tiles/", vv):
+                # print("CONTINUING")
+                # continue
             # vv_file_name = Path(vv).name
             # vh_file_name = Path(vh).name
             
@@ -149,46 +161,47 @@ def create_sample_split() -> None:
             vh = f"test/{dir}/{vh}"
             updated_frames["test"][test_frame_name].append(vh)
         
-        if len(updated_frames["test"][test_frame_name]) <= 1:
-            updated_frames["test"].pop(test_frame_name, None)
+        # if len(updated_frames["test"][test_frame_name]) <= 1:
+        #     updated_frames["test"].pop(test_frame_name, None)
         
-        else:
-            temp = updated_frames['test'][test_frame_name]
-            temp.sort()
-            composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
+        # else:
+        temp = updated_frames['test'][test_frame_name]
+        temp.sort()
+        composite_temp = [(tileVH, tileVV) for tileVH, tileVV in zip(temp[0::2], temp[1::2])]
 
-            # in cases where S1A and S1B are in the same list they are sorted by dates
-            composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
-            updated_frames['test'][test_frame_name] = composite_temp
+        # in cases where S1A and S1B are in the same list they are sorted by dates
+        composite_temp.sort(key=lambda composite: composite[0].split("_")[1:])
+        updated_frames['test'][test_frame_name] = composite_temp
 
     print("Train data")
-    for frame_name in tqdm(frame_names):
-        updated_frames["train"][frame_name] = []
-        if not valid_mask(frame_name, mask_dict):
-            updated_frames["train"].pop(frame_name, None)
-            continue
-        for vv, vh in frames[frame_name]:
-            if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
+    if not is_test_data:
+        for frame_name in tqdm(frame_names):
+            updated_frames["train"][frame_name] = []
+            if not valid_mask(frame_name, mask_dict):
+                updated_frames["train"].pop(frame_name, None)
                 continue
-            if not validate_image(prep_tiles_path, "tiles/", vv):
-                continue
+            for vv, vh in frames[frame_name]:
+                if not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vv)) or not os.path.isfile(os.path.join(prep_tiles_path,"tiles/", vh)):
+                    continue
+                # if not validate_image(prep_tiles_path, "tiles/", vv):
+                #     continue
 
-            # vv_file_name = Path(vv).name
-            # vh_file_name = Path(vh).name
-            
-            shutil.move(os.path.join(prep_tiles_path,"tiles/",vv), f"{dir_path}/train/{dir}")
-            # vv = f"train/{dir}/{vv_file_name}"
-            vv = f"train/{dir}/{vv}"
-            updated_frames["train"][frame_name].append(vv)
+                # vv_file_name = Path(vv).name
+                # vh_file_name = Path(vh).name
+                
+                shutil.move(os.path.join(prep_tiles_path,"tiles/",vv), f"{dir_path}/train/{dir}")
+                # vv = f"train/{dir}/{vv_file_name}"
+                vv = f"train/{dir}/{vv}"
+                updated_frames["train"][frame_name].append(vv)
 
-            shutil.move(os.path.join(prep_tiles_path,"tiles/",vh), f"{dir_path}/train/{dir}")
-            # vh = f"train/{dir}/{vh_file_name}"
-            vh = f"train/{dir}/{vh}"
-            updated_frames["train"][frame_name].append(vh)
+                shutil.move(os.path.join(prep_tiles_path,"tiles/",vh), f"{dir_path}/train/{dir}")
+                # vh = f"train/{dir}/{vh_file_name}"
+                vh = f"train/{dir}/{vh}"
+                updated_frames["train"][frame_name].append(vh)
 
-        if len(updated_frames["train"][frame_name]) <= 1:
-            updated_frames["train"].pop(frame_name, None)
-        else:
+            # if len(updated_frames["train"][frame_name]) <= 1:
+            #     updated_frames["train"].pop(frame_name, None)
+            # else:
             # sorting ahead of time speeds up model
             temp = updated_frames['train'][frame_name]
             temp.sort()

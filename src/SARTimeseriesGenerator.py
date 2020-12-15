@@ -39,17 +39,20 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
         self.n_classes = n_classes
         self.shuffle = shuffle
         self.clip_range = clip_range
-        self.metadata = []
+        
         self.augment = augmentations
-
-        self.__meet_min_steps()
+        self.metadata = []
+        
+        self.init = False
 
         if training:
+            self.__meet_min_steps()
             while len(self.frame_data) < min_samples:
                 self.frame_data.extend(random.sample(self.frame_data, min(min_samples - len(self.frame_data), len(self.frame_data))))
 
+        # print("PRE INIT:\n", len(self.frame_data))
         self.frame_data = [CDLFrameData(sample[0], sample[1], dataset_directory) for sample in self.frame_data]
-
+        # print(len(self.frame_data), "\n")
         self.on_epoch_end() 
 
     def __len__(self):
@@ -134,7 +137,17 @@ class SARTimeseriesGenerator(keras.utils.Sequence):
 
     '''when each batch begins we record what files are passed to the model'''
     def __setBatchMetadata(self, batch: Tuple[List[Tuple[str, str]], str]):
-        self.metadata.append(batch)
+        # print(len(self.metadata), "\n")
+        # print(batch, "\n")
+        # for data in self.metadata:
+        #     for sample in data:
+        #         if data
+            # if batch 
+        # if batch not in self.metadata:
+        if not self.init:
+            self.init = True
+        else:
+            self.metadata.append(batch)
 
 
 # Classes:

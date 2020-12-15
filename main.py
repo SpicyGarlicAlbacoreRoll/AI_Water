@@ -39,7 +39,7 @@ def train_wrapper(args: Namespace) -> None:
         weights = model.get_weights()
         # optimizer = model.optimizer
         model.compile(
-            loss="mean_squared_error", optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2)]
+            loss=jaccard_distance_loss, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2)]
         )
         model.set_weights(weights)
     #     model.compile(
@@ -102,7 +102,10 @@ def test_wrapper(args: Namespace) -> None:
        #    ]
        # ]
     # }
-
+    print(f"length of metadata: {len(test_batch_metadata)}")
+    print(f"length of predictions: {len(predictions)}")
+    
+    # fixed = False
     # for batches
     non_blank_predictions = 0
     for idx, batch in enumerate(test_batch_metadata):
@@ -110,27 +113,27 @@ def test_wrapper(args: Namespace) -> None:
         samples = []
         # for sample in batch
         for idy, sample in enumerate(batch):
-            current_prediction_idx = idx * BATCH_SIZE + idy
+            current_prediction_idx = idx * model_batch_size + idy
             current_subdataset = sample[0][0].split("/")[1]    #IE: WA_2018, AK_2020
             prediction_subdataset_name = f"predictions/{prediction_directory_name}/{current_subdataset}"
 
             if not os.path.isdir(prediction_subdataset_name):
                 os.mkdir(prediction_subdataset_name)
 
-            if len(predictions) > current_prediction_idx:
-                image = predictions[current_prediction_idx]
-                image = np.array(image[:, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1)).astype(dtype=np.uint8)
+            # if len(predictions) > current_prediction_idx:
+            image = predictions[current_prediction_idx]
+            image = np.array(image[:, :, 0].reshape(NETWORK_DEMS, NETWORK_DEMS, 1)).astype(dtype=np.uint8)
 
-                if np.ptp(image) != 0:
-                    # img_0 = array_to_img(image)
-                    prediction_frame = "_".join(sample[0][0].split("_")[-4:])
-                    filename = f"{prediction_subdataset_name}/CDL_{current_subdataset}_prediction_{prediction_frame}"
-                    dataset_path_to_sample = f"datasets/{args.dataset}/{sample[0][0]}"
-                    # filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
-                    save_img(filename, dataset_path_to_sample, image)
-                    img_0 = array_to_img(image)
-                    img_0.save(filename.replace(".tif", ".png"))
-                    non_blank_predictions+=1
+            # if np.ptp(image) != 0:
+            # img_0 = array_to_img(image)
+            prediction_frame = "_".join(sample[0][0].split("_")[-4:])
+            filename = f"{prediction_subdataset_name}/CDL_{current_subdataset}_prediction_{prediction_frame}"
+            dataset_path_to_sample = f"datasets/{args.dataset}/{sample[0][0]}"
+            # filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
+            save_img(filename, dataset_path_to_sample, image)
+            img_0 = array_to_img(image)
+            img_0.save(filename.replace(".tif", ".png"))
+            non_blank_predictions+=1
 
 
             timeseries_sample = {}
@@ -196,6 +199,11 @@ if __name__ == '__main__':
         action='store_true',
         help='Replace the file if it exists'
     )
+    train.add_argument('--cdl',
+        action='store_true',
+        dest='cdl_model',
+        help='train using cropland timeseries architecture'
+        )
     train.add_argument(
         '--continue',
         '-c',
@@ -216,6 +224,11 @@ if __name__ == '__main__':
         help="Replace mask with the networks",
         action='store_true'
     )
+    test.add_argument('--cropland',
+        action='store_true',
+        dest='cdl_model',
+        help='test using existing cropland timeseries model'
+        )
     test.set_defaults(func=test_wrapper)
 
     # Parse and execute selected function

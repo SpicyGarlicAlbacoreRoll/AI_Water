@@ -12,7 +12,6 @@ from random import Random
 from typing import Dict, Generator, List, Optional, Tuple
 
 import numpy as np
-import tensorflow as tf
 
 import cv2
 from albumentations import (
@@ -132,21 +131,33 @@ def find_timeseries_metadata(dataset: str, training: bool = False) -> Dict:
     files = os.listdir(dataset_dir(dataset))
     
     print("Found metadata files:")
+
     for file in files:
-        
-        if file.endswith('.json'):
-            with open(os.path.join(dataset_dir(dataset), file)) as json_file:
-                print(f"\t{file}")
-                f = json.load(json_file)
+        f, key = open_dataset_metadata_file(file, dataset)
 
-                key = file.split(".")[0]
-
-                if training:
-                    metadata[key] = f.get("train")
-                else:
-                    metadata[key] = f.get("test")
+        # if the file was a json file
+        if key:
+            print(f"\t{file}")
+            if training:
+                metadata[key] = f.get("train")
+            else:
+                metadata[key] = f.get("test")
 
     return metadata
+
+''' Opens json subdataset metadata file (such as "WA_2018_metadata.json") located in a dataset's root dir 
+    Params: file (json metadata file), dataset root dir name (IE: "US_SW", "US_NW")
+    Returns: file subdataset prefix (In the case of the given file, "WA_2018")'''
+def open_dataset_metadata_file(file: str, dataset: str):
+
+    if file.endswith('.json'):
+        with open(os.path.join(dataset_dir(dataset), file)) as json_file:
+            data = json.load(json_file)
+            key = file.split(".")[0]
+    
+            return data, key
+    else:
+        return None, None
 
 """From the metadata returned by find_timeseries_metadata 
 we search for valid (non-empty)timeseries sample frame indices
@@ -172,7 +183,7 @@ def generate_frame_keys(metadata: Dict) -> Tuple[List[TimeseriesMetadataFrameKey
             valid_files = []
 
             if len(metadata[sub_dataset][key]) != 0:
-                time_steps = int(max(len(metadata[sub_dataset][key]) / 2, time_steps))
+                time_steps = int(max(len(metadata[sub_dataset][key]), time_steps))
                 subset_file_count += len(metadata[sub_dataset][key])
                 subset_sample_size += 1
                 frame_keys.append((sub_dataset, key))
