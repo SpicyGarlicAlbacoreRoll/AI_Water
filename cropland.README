@@ -1,28 +1,31 @@
 ## Workflow:
 1. Find dataset in AI Cropland S3 data bucket
 
-### If dataset has tiled64 folder with zip file(s), 
+### If using 64x64 tiles and dataset has tiled64 folder with zip file(s),
 2. download the tiled64 folder with (from the root project directory)
- -aws s3 cp "s3://path/to/dataset/tiled64/" ./ --recursive
+ -aws s3 cp "s3://path/to/dataset/tiled64/" path/to/target/dir/ --recursive
 3. unzip contents and skip to step 12
 
+Note: Tiling data to 64x64 is very time consuming, hence the zip file
+
 ### If the dataset folder contains no tiled64 folder
-2. Download tif files in that dataset's folder with (from the root project directory)
+1. Download tif files in that dataset's folder with (from the root project directory)
  -aws s3 cp "s3://path/to/dataset/" ./prep_tiles --recursive
-3. make two directories called "tiles" and "mask_tiles" in the prep_tiles directory
-3. Move prep_util.sh from the scripts/ to the root project directory
-4. Run the script with
- -./prep_util.sh
-5. Wait for prep_utils to finish (This *will* take a while)
-6. Once prep_utils is finished, run
- - python3 sample_selector.py
-7. Enter the dataset's State acronym (ie: AK, WA, OR)
-8. Enter the year of the dataset (2019, 2018, etc)
-9. Wait for sample_selector.py to finish (This will *also* take a while)
-10. There should be a directory for the dataset in the project root directory (ie: WA_2018, OR_2019, etc)
-11. Move all images in prep_tiles/mask_tiles to a 
-new directory in this dataset's directory called "[name_of_dataset]_masks" (IE: WA_2018_masks, OR_2019_masks)
-12. Copy this new masks directory into both the test and train folder in the dataset directory
+2. Copy raster_padder.py to the downloaded dataset directory and move into it, create a folder in it called "padded", then run raster_padder.py. 
+and move the contents of padded dir and CDL_[dataset name]_mask.tif to prep_tiles
+3. Create two empty directories called "tiles" and "mask_tiles" in the prep_tiles directory
+4. Move prep_util.sh from the scripts/ to the root project directory
+5. Run the script with  -./prep_util.sh [tile size (default is 256)]
+6. Wait for prep_utils to finish (Depending on tile size, this *will* take a while)
+7. Once prep_utils is finished, run - python3 sample_selector.py
+8. Enter the dataset's State acronym (ie: AK, WA, OR)
+9. Enter the year of the dataset (2019, 2018, etc)
+10. If data is only meant for the model to predict with, enter 'test', otherwise enter 'train'
+11. Wait for sample_selector.py to finish (This will *also* take a while depending on your tile size)
+12. There should be a directory for the dataset in the project root directory (ie: WA_2018, OR_2019, etc)
+13. Move all images in prep_tiles/mask_tiles to a new directory in this dataset's directory called "[name_of_dataset]_masks" (IE: WA_2018_masks, OR_2019_masks)
+14. (Optional) Depending on how long that took, you might want to archive the dataset and its masks as a zip or tar. (I suggest using tar with pigz on the folder for speed)
+15. Copy this new masks directory into both the test and train folder in the dataset directory
 
 Repeat steps 1-12 for each dataset you wish to train with
 

@@ -22,6 +22,7 @@ from PIL import Image, ImageOps
 from keras.optimizers import Adam
 from keras.metrics import MeanIoU
 from keras.losses import BinaryCrossentropy
+from keras.optimizers.schedules import ExponentialDecay
 from src.model.architecture.dice_loss import dice_coefficient_loss, dice_coefficient, cosh_dice_coefficient_loss
 from src.plots import write_mask_to_file
 from src.gdal_wrapper import gdal_open
@@ -37,9 +38,10 @@ def train_wrapper(args: Namespace) -> None:
         model = load_model(model_name)
         history = model.__asf_model_history
         weights = model.get_weights()
+        lr_schedule = ExponentialDecay(9.2e-4, decay_steps=2000, decay_rate=0.96, staircase=True)
         # optimizer = model.optimizer
         model.compile(
-            loss=jaccard_distance_loss, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy', MeanIoU(num_classes=2)]
+            loss=jaccard_distance_loss, optimizer=Adam(learning_rate=lr_schedule), metrics=['accuracy', MeanIoU(num_classes=2)]
         )
         model.set_weights(weights)
     #     model.compile(
@@ -132,7 +134,7 @@ def test_wrapper(args: Namespace) -> None:
             # filename_0 = "predictions/{0}/batch_{1}/batch_{1}_sample_{2}.tif".format(prediction_directory_name, batch_index, idy % model_batch_size)
             save_img(filename, dataset_path_to_sample, image)
             img_0 = array_to_img(image)
-            img_0.save(filename.replace(".tif", ".png"))
+            # img_0.save(filename.replace(".tif", ".png"))
             non_blank_predictions+=1
 
 

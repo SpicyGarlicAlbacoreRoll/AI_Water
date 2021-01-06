@@ -1,0 +1,123 @@
+Author: Kim Fairbanks
+Product Owner: Thomas Logan
+AI Cropland Team: Hannah Donajkowski and Kim Fairbanks
+01/05/2021
+
+Below are some notes and rationale for the model's architecture and design over time.
+
+##############################################################################################
+
+
+# Current Design
+    The current cropland model (found in src/model/architecture/crop_masked.py) is a
+    modified version of the original AI Water project, which is a UNET style architecture 
+    (one of the most popular solutions for image segmentation).
+
+    The input data is a time series VV+VH composite images, stacked along the channel axis (more on that later),
+    with an input dimensions of 3 (Width, Height, Channels*Timesteps). The width and height dimensions have 
+    "None" as their value in the model's input, so the model can be used on time series data of any width or height.
+
+    The basic design of the UNET is a encoding phase and is often described as the model finding out "what" something is, where
+    the dimensions of the model are halved at each layer with a maxpooling2D operation. 
+    Followed is the decoding stage, how the model determines "where" something is with upscaling2D operations until the image
+    is back at its original resolution.
+
+    At the end of the model is a single convolutional2D layer using a "sigmoid" activation (for binary classifcation). Replace with softmax
+    if you're using categorical data (IE, are classifying more than 2 values)
+
+    The model uses jaccard distance loss, a popular loss function for segmentation problems on unbalanced dataset. I've found this loss
+    to work the best for both higher pixel accuracy and improving the MEAN_IOU score while training (how well the predictions overlap the ground truth data).
+    An exponential decay learning rate is used to keep the model from settling into a valley by decreasing the learning rate after a user defined amount of steps (batches)
+
+
+##############################################################################################
+
+
+# Input Data Shape
+    The original architecture was a TimeDistributed UNET, where most layers were wrapped in Keras's TimeDistributed layer.
+    The input dimensions (again, not including batch size) were a 4D tensor object, (n timesteps, width, height, channels (typically 2, for the vv+vh))
+    The key difference was instead of Conv2D layers between the encoding and decoding stage and the final convolution were replaced with keras's
+    ConvLSTM2D layers. They're a special wrapper that take operate as an lstm layer for time series image data.
+    While the model does learn with this architecture it required significantly more memory and time to train. Switching to the
+    channel stacking method described in the current design section and dropping the convLSTM2D layers resulted in less memory, faster training,
+    and better accuracy.
+
+
+##############################################################################################
+
+
+# Tweakable Hyper Parameters
+    
+    # Loss Functions:
+        Jaccard Distance Loss (Current model's loss function)
+        Mean Squared Error,
+        Binary Crossentropy
+        Categorical Crossentropy
+        Dice Loss
+        COSH Dice Loss
+
+        All yielded similar results, but Jaccard distance loss actually had an improving MEAN_IOU score, unlike every other loss tried
+
+
+    # Convolutional Filters
+        The number of filters (defiend in config.py) is a tweakable hyper-parameter that basically determines
+        how many trainable parameters the model can have. The trade off is more memory and longer training times,
+        but (to a point) better accuracy. Having too low a filter size will limit how much the model can actually learn,
+        too high and the model will risk over-fitting on the training data and not actually generalize well.
+    
+    # Time Steps
+        Having more timesteps improves training results, however not all the data 
+        has an equivalent amount of timesteps (some have 28 steps, others might have 36 steps).
+        To accommadate this, the SARTimeseriesGenerator class removes all samples that don't
+        have a user defined minimum amount of time steps, and if the sample is long enough but still shorter
+        than the user defined amount of time steps the CDLFrameData class will pad out the sequence by 
+        randomly selecting existing timesteps. If the sequence is longer than the user defined amount of time steps,
+        the CDLFrameData class will randomly selected the proper amount of timesteps, but will always include the first and last
+        timesteps in the sample.
+    
+    # Augmentation Probability
+        Random image augmentation is a popular method for artifically increasing the amount of training data to train a model with.
+        The CDLFrameData class uses the popular Albumentations library for randomly augmenting training data at run time as its
+        being fed to the model. Possible augmentations include random shifting, scaling, rotations, and horizontal and vertical flips.
+        Augmentations via transformations is fine, but things like hue and brightness shifts when SAR data are (probably) best left unused
+        as SAR data relies on pixel amplitude for interpretation (might be wrong, worth exploring)
+
+        Too little augmentation and you lose the benefit of having more data to train with. Too much and the model
+        won't actually learn anything. The augmentation probability is controlled by AUGMENTATION_PROBABILITY in config.py, val between 0-1
+
+    # Batch Size (Samples per step)
+        A lot has been said on the batch size's effects on training elsewhere online, but the gist is batch sizes should be
+        in powers of 2 (1, 2, 16, 32, 64, ...), and should be larger (32 is an okay starting point). Higher batch sizes require more
+        memory, but (up to a point, depending on hardware and Tensorflow version) yield faster and more accurate results.
+    
+    # Class Distribution 
+        Early on a problem with the model was a imbalance in training data between non-cropland 
+        and cropland pixels (non-cropland be ~90% of aggregate data). This led to the model getting
+        high accuracy by always predicting blank images (all 0 for non-cropland), regardless of whether it was true or not.
+        To fix this all tiled data is run through the sample selector, which removes all tiles 
+        that have too high a percentage of non-crop pixels (as of now over 80%).
+        After this tweak, the model began improving and actually prediciting non-blank images.
+
+    # Tile Size
+        Tile size affects memory requirements, model learning, and sampling/preperation time (making smaller tiles like 64x64 takes significantly longer).
+        64x64 has been attempted, but similar if not better results have been yielded with 256x256. Something recommended online
+        is training with smaller tiles and predicting on full images. Since this is time series data using the full images (some a few dozen of GB) is
+        unfeasible without a lot of memory, so we use 1024x1024 tiles instead.
+    
+    # Binary vs Semantic Image Segmentation
+        With a couple adjustments the CDLFrameData class can be used to create one_hot encodings for categorical data (classification of greater than 2 classes)
+        rather than binary classification (0 or 1, not cropland or cropland) per pixel. The reason the model is currently being trained on
+        binary masks is because the amount of data to train per class increases significantly as there are more classes of varying frequency
+        for the model to learn. The way around this (theoretically) is to consider all crops within a criteria (in our case top 10 in the US)
+        to be part of the same class (more on this in possible jumping off points to consider if taking up the project again)
+    
+
+##############################################################################################
+
+
+# Possible routes to explore going forward
+    1. Instead of using a mask of the top ten crops, using a mask of the top 5 or even top 3 might improve the model accuracy. That would involve
+    creating a modified version of the top10crop qml file, applying the style to each crop mask (ie: "CDL_WA_2018_croppped.tif") and creating a binary mask
+    out of it.
+    2. Experimenting with different learning rate decay methods
+    3. Experimenting with different class sampling threshold values in sample_selector.py in the valid_mask function

@@ -15,7 +15,7 @@ from typing import Dict, List
 from math import floor
 import sys
 
-def valid_mask(frame_name, mask_dict) -> bool:
+def valid_mask(frame_name, mask_dict, is_prediction_data = False) -> bool:
     frame_name = f"{frame_name}.tif"
     target_mask_file = mask_dict.get(frame_name)
     if target_mask_file == None:
@@ -35,6 +35,8 @@ def valid_mask(frame_name, mask_dict) -> bool:
     class_dict = dict(zip(unique_classes, unique_count))
     frequency_dict = find_frequencies(class_dict, unique_classes, image_size)
     
+    if is_prediction_data:
+        return True
    
     if frequency_dict.get("0") == None:
         return True
@@ -137,7 +139,7 @@ def create_sample_split() -> None:
     mask_dict = dict(zip(["_".join(mask_file_name.split("_")[4:]) for mask_file_name in mask_files], mask_files))
     for test_frame_name in tqdm(test_data_frame_names):
         updated_frames["test"][test_frame_name] = []
-        if not valid_mask(test_frame_name, mask_dict):
+        if not valid_mask(test_frame_name, mask_dict, is_test_data):
             updated_frames["test"].pop(test_frame_name, None)
             continue
         # if frames[test_frame_name]

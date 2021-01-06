@@ -2,6 +2,10 @@
 # fix negative resolution
 
 for file in *.tif; 
+    
+    # https://gis.stackexchange.com/questions/108673/using-gdal-command-line-to-copy-projections
+    PROJ=$(gdalsrsinfo -o wkt $file)
+    do echo "$PROJ"
     # adjust NS resolution 
-    do echo "$file"; gdalwarp -t_srs EPSG:4326 -overwrite "$file" "mosaic/$(basename "$file" .tif).tif"
+    # do echo "$file"; gdalwarp -t_srs $PROJ -overwrite "$file" "mosaic/$(basename "$file" .tif).tif"
 done
