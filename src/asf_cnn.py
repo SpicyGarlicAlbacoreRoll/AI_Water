@@ -54,12 +54,12 @@ def train_model(
         if verbose > 0:
             print(f"Epoch {epoch}/{epochs}")
 
-        # clear_session()
+        clear_session()
         
         history = model.fit(
             x=training_set,
             validation_data=validation_set,
-            steps_per_epoch=150,
+            # steps_per_epoch=150,
             epochs=1,
             workers=6,
             verbose=verbose)

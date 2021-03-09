@@ -12,7 +12,6 @@ from random import Random
 from typing import Dict, Generator, List, Optional, Tuple
 
 import numpy as np
-import tensorflow as tf
 
 import cv2
 from albumentations import (
@@ -22,7 +21,7 @@ from albumentations import (
 
 from ..asf_typing import TimeseriesMetadataFrameKey
 from ..config import NETWORK_DEMS
-from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY, BATCH_SIZE, MIN_TRAINING_SAMPLES
+from ..config import TIME_STEPS, N_CHANNELS, TRAINING_LOOPS, AUGMENTATION_PROBABILITY, BATCH_SIZE, MIN_TRAINING_SAMPLES, CROP_CLASSES
 from ..gdal_wrapper import gdal_open
 from ..SARTimeseriesGenerator import SARTimeseriesGenerator
 from .common import dataset_dir, valid_image
@@ -52,11 +51,10 @@ def load_timeseries_dataset(dataset: str) -> Tuple[SARTimeseriesGenerator]:
 
     batch_size = BATCH_SIZE
     time_steps = TIME_STEPS
-    sub_sampling = 1
-    n_classes = 2
+    n_classes = CROP_CLASSES
     training_p = AUGMENTATION_PROBABILITY
 
-    print_generator_info(validation_split, time_steps, sub_sampling, sample_size)
+    print_generator_info(validation_split, time_steps, sample_size)
 
     # augmentations applied to training data    
     AUGMENTATIONS_TRAIN = Compose([
@@ -105,7 +103,6 @@ def load_test_timeseries_dataset(dataset: str) -> Tuple[List[Dict], SARTimeserie
     test_metadata = find_timeseries_metadata(dataset, training=False)
     frame_keys, sample_size, time_steps = generate_frame_keys(test_metadata)
     time_steps = TIME_STEPS
-    sub_sampling = 1
     batch_size=BATCH_SIZE
     n_classes=2
     test_iter = SARTimeseriesGenerator(
@@ -134,21 +131,33 @@ def find_timeseries_metadata(dataset: str, training: bool = False) -> Dict:
     files = os.listdir(dataset_dir(dataset))
     
     print("Found metadata files:")
+
     for file in files:
-        
-        if file.endswith('.json'):
-            with open(os.path.join(dataset_dir(dataset), file)) as json_file:
-                print(f"\t{file}")
-                f = json.load(json_file)
+        f, key = open_dataset_metadata_file(file, dataset)
 
-                key = file.split(".")[0]
-
-                if training:
-                    metadata[key] = f.get("train")
-                else:
-                    metadata[key] = f.get("test")
+        # if the file was a json file
+        if key:
+            print(f"\t{file}")
+            if training:
+                metadata[key] = f.get("train")
+            else:
+                metadata[key] = f.get("test")
 
     return metadata
+
+''' Opens json subdataset metadata file (such as "WA_2018_metadata.json") located in a dataset's root dir 
+    Params: file (json metadata file), dataset root dir name (IE: "US_SW", "US_NW")
+    Returns: file subdataset prefix (In the case of the given file, "WA_2018")'''
+def open_dataset_metadata_file(file: str, dataset: str):
+
+    if file.endswith('.json'):
+        with open(os.path.join(dataset_dir(dataset), file)) as json_file:
+            data = json.load(json_file)
+            key = file.split(".")[0]
+    
+            return data, key
+    else:
+        return None, None
 
 """From the metadata returned by find_timeseries_metadata 
 we search for valid (non-empty)timeseries sample frame indices
@@ -174,7 +183,7 @@ def generate_frame_keys(metadata: Dict) -> Tuple[List[TimeseriesMetadataFrameKey
             valid_files = []
 
             if len(metadata[sub_dataset][key]) != 0:
-                time_steps = int(max(len(metadata[sub_dataset][key]) / 2, time_steps))
+                time_steps = int(max(len(metadata[sub_dataset][key]), time_steps))
                 subset_file_count += len(metadata[sub_dataset][key])
                 subset_sample_size += 1
                 frame_keys.append((sub_dataset, key))
@@ -213,12 +222,11 @@ def validate_image(path: str, dir: str, image: str) -> bool:
     return True
 
 """Prints information related to the model"""
-def print_generator_info(validation_split, time_steps, sub_sampling, sample_size):
+def print_generator_info(validation_split, time_steps, sample_size):
     split_index = floor(sample_size * validation_split)
     print("\n")
     print(f"validation Split:\t{validation_split * 100}%")
     print(f"Timesteps:\t{time_steps}")
-    print(f"Random Subsampling:\t{sub_sampling}")
     print(f"Base Training Samples:\t{sample_size-split_index}")
     print(f"Base Validation Samples:\t{split_index}")
 

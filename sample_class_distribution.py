@@ -29,7 +29,7 @@ def sample_class_distributions():
     file_name = "CDL_WA_2018_mask.tif"
     data = np.nan_to_num(np.asarray(read_file(file_name)).flatten())
     image_size = len(data)
-    print("Counting unique classes")
+    print(f"Counting unique classes for {file_name}")
     # get a list of unique classes in image, and the number of occurrences
     unique_classes, counts = np.unique(data, return_counts=True)
     # create a dictionary that links each unique value to it's occurrences in the image
